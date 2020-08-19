@@ -324,6 +324,8 @@ class TablesForGeneCalls(Table):
                   "num_genes_with_internal_stops": 0}
 
         # the main loop to go through all the gene calls.
+        from collections import Counter
+        count = Counter()
         for gene_callers_id in gene_calls_dict:
             gene_call = gene_calls_dict[gene_callers_id]
             partial = gene_call['partial']
@@ -361,7 +363,10 @@ class TablesForGeneCalls(Table):
             elif predict_frame:
                 # no amino acid sequence is provided, BUT USER WANTS FRAME TO BE PREDICTED
                 # we may be good, if we can try to predict one for it.
-                frame, amino_acid_sequence = utils.get_most_likely_translation_frame(sequence, model=model, stop_prob=stop_prob, null_prob=null_prob)
+
+                flag=False
+                frame, amino_acid_sequence = utils.get_most_likely_translation_frame(sequence, model=model, stop_prob=stop_prob, null_prob=null_prob, flag=flag)
+                count[frame] += 1
 
                 if frame is None:
                     # we not good because we couldn't find a frame for it. because this gene call has no predicted frame,
@@ -425,6 +430,8 @@ class TablesForGeneCalls(Table):
                                       "sense as a gene call: '%s'." % (str(gene_callers_id), sequence, amino_acid_sequence))
 
             amino_acid_sequences[gene_callers_id] = amino_acid_sequence
+
+        print(count)
 
         # reporting time
         self.run.warning(None, header="EXTERNAL GENE CALLS PARSER REPORT", lc="cyan")

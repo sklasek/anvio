@@ -1982,7 +1982,7 @@ def translate(sequence):
     return ''.join(translated_sequence)
 
 
-def get_most_likely_translation_frame(sequence, model=None, null_prob=None, stop_prob=None, log_likelihood_cutoff=2):
+def get_most_likely_translation_frame(sequence, model=None, null_prob=None, stop_prob=None, log_likelihood_cutoff=2, flag=False):
     """Predict the translation frame with a markov model of amino acid sequences
 
     Parameters
@@ -2093,6 +2093,10 @@ def get_most_likely_translation_frame(sequence, model=None, null_prob=None, stop
 
     # if the best amino acid sequence ends with a stop codon, remove it.
     amino_acid_sequence = amino_acid_sequence[:-1] if amino_acid_sequence.endswith('*') else amino_acid_sequence
+
+    if flag:
+        print(candidates)
+        import ipdb; ipdb.set_trace()
 
     return frame_best, amino_acid_sequence
 

@@ -1,116 +1,89 @@
 #! /usr/bin/env Rscript
-library(optparse)
 
-option_list <- list(
-    make_option(
-        c("-e", "--externalgenecalls"),
-        type="character",
-        help="help"
-    ),
-    make_option(
-        c("-f", "--externalfunctions"),
-        type="character",
-        help="help"
-    )
-)
+# To run this script you must have run `anvi-export-functions` and `anvi-export-gene-calls`:
+# anvi-export-functions -c ST_809635352_CPS_0028.db --annotation-sources COG_FUNCTION -o ST_809635352_CPS_0028_functions.txt
+# anvi-export-gene-calls -c ST_809635352_CPS_0028.db --gene-caller prodigal -o ST_809635352_CPS_0028_gene_calls.txt
 
-op <- OptionParser(
-    option_list=option_list,
-    description="Here is what the program does",
-)
-args <- parse_args(op)
-
-args$externalgenecalls
-
+# anvi-export-functions -c ST_764588959_CPS_0011.db --annotation-sources COG_FUNCTION -o ST_764588959_CPS_0011_functions.txt
+# anvi-export-gene-calls -c ST_764588959_CPS_0011.db --gene-caller prodigal -o ST_764588959_CPS_0011_gene_calls.txt
 
 # Load env
+library(optparse)
 library(tidyverse)
 library(gggenes)
 
-# Import data
-# gene_calls <- read_tsv("Bfragilis_0001_CPS_0005-gene-calls.txt")
-functions <- read_tsv("Bfragilis_0001_CPS_0005-functions.txt")
-metagenomic_contig_orf_coord <- read_tsv("Bfragilis_0001_CPS_0005_contig_orf_coord.tsv")
+option_list <- list(
+  make_option(
+    c("-c", "--contigsdb"),
+    type="character",
+    help="help"
+  )
+)
 
-# COG colors
-functions_prep <- functions %>% 
+op <- OptionParser(
+  option_list=option_list,
+  description="Here is what the program does",
+)
+args <- parse_args(op)
+
+args$contigsdb
+
+cleanfunction()
+
+
+contig_db_list <- c("ST_809635352_CPS_0028.db", "ST_764588959_CPS_0011.db")
+
+# Load data
+get_files <- function(X) {
+  ###
+  # X <- contig_db_list[[1]]
+  ###
+  
+  X <- str_remove(X, ".db")
+  
+  functions_path <- Sys.glob(paste0("/Users/mschechter/github/2018_Schmid_Shaiber_et_al_CPS/data/CONTIGSDB/", X,'*', '_functions.txt'))
+  gene_calls_path <- Sys.glob(paste0("/Users/mschechter/github/2018_Schmid_Shaiber_et_al_CPS/data/CONTIGSDB/", X,'*', '_gene_calls.txt'))
+  
+  functions <- read_tsv(functions_path)
+  gene_calls <- read_tsv(gene_calls_path)
+  
+  listy <- list(name = X, functions = functions, gene_calls = gene_calls)
+}
+
+contigs <- lapply(contig_db_list, get_files)
+
+# Clean data for gggenes
+prepare_to_plot <- function(X) {
+  
+  ###
+  # X <- contigs[[2]]
+  ###
+  externalfunctions_clean <- X$functions %>% 
     filter(source != "COG_CATEGORY") %>% 
     select(gene_callers_id, accession, e_value) %>%
     mutate(fill = "black")
-
-# # functions_prep$accession %>% unique() 
-# library("RColorBrewer")
-# 
-# num_colors <- functions %>% 
-#   filter(source != "COG_CATEGORY") %>% 
-#   select(gene_callers_id, accession, e_value) %>%
-#   .$accession %>% unique() %>% length()
-# 
-# brewer.pal(n = num_colors, name = "RdBu")
-
-
-# Join
-example_genes
-
-contig_info <- metagenomic_contig_orf_coord %>% 
-    left_join(functions_prep) %>%
+  
+  contig_info <- X$gene_calls %>%
+    mutate(direction = case_when(direction == FALSE ~ "f")) %>%
+    left_join(externalfunctions_clean) %>%
     select(contig, accession, start, stop, direction, fill) %>%
     rename(molecule = contig ,gene = "accession", strand = direction, end = stop) %>%
-    # mutate(col = "black",
-    #        lty='1',
-    #        lwd='1',
-    #        pch='8',
-    #        cex='1',
-    #        gene_type='arrows') %>%
     mutate(direction = gsub("f", "1", strand)) %>%
-    mutate(direction = gsub("r", "-1", strand)) 
-# mutate(lwd = as.numeric(lwd)) %>%
-# mutate(lty = as.numeric(lty)) %>%
-# mutate(pch = as.numeric(pch)) %>%
-# mutate(cex = as.numeric(cex)) 
+    mutate(direction = gsub("r", "-1", strand))
+}
 
-contig_info %>%
-    ggplot(aes(xmin = start,
-               xmax = end,
-               y = molecule,
-               fill = fill,
-               label = gene,
-               forward = strand
-    )) + # important shit
-    geom_gene_arrow(arrowhead_height = unit(7, "mm"),
-                    arrowhead_width = unit(3, "mm"),
-                    colour = "white") +
-    geom_gene_label(align = "center", # https://cran.r-project.org/web/packages/ggfittext/vignettes/introduction-to-ggfittext.html
-                    color = "black",
-                    min.size = 1,
-                    position = "identity") +
-    facet_wrap(~ molecule, scales = "free", ncol = 1) +
-    theme_genes() +
-    scale_fill_brewer() +
-    theme(plot.background = element_rect(fill = "#222222"), # plot background color
-          legend.background = element_rect(fill = "#222222"), # legend background color
-          legend.text=element_text(color="white"), # legend text color
-          legend.title =element_text(color = "white"), # legend title color
-          axis.title.x = element_text(colour = "white"), # x-axis text color
-          axis.title.y = element_text(colour = "white"), # y-axis text color
-          axis.line.x = element_line(color = "white"),
-          axis.text.x = element_text(color="white"),
-          axis.text.y = element_text(color="white"),
-          legend.position="bottom") +
-    ylab("Genomes") + # y-axis color
-    labs(fill = "Genes") # Legend title
+contigs_prepped <- lapply(contigs, prepare_to_plot)
 
+# Rowbind all contig tables
+contigs_final <- bind_rows(contigs_asdf)
 
-library(ggplot2)
-library(gggenes)
-ggplot(contig_info, aes(xmin = start, xmax = end, y = molecule, fill = gene, label = gene)) +
-    geom_gene_arrow() +
-    facet_wrap(~ molecule, scales = "free", ncol = 1) +
-    scale_fill_brewer(palette = "Set3") +
-    geom_gene_label(align = "left", # https://cran.r-project.org/web/packages/ggfittext/vignettes/introduction-to-ggfittext.html
-                    color = "black",
-                    min.size = 1,
-                    position = "identity")
+# Plot
+ggplot(contigs_final, aes(xmin = start, xmax = end, y = molecule, fill = gene, label = gene)) +
+  geom_gene_arrow() +
+  facet_wrap(~ molecule, scales = "free", ncol = 1) +
+  scale_fill_brewer(palette = "Set3") +
+  geom_gene_label(align = "left", # https://cran.r-project.org/web/packages/ggfittext/vignettes/introduction-to-ggfittext.html
+                  color = "black",
+                  min.size = 1,
+                  position = "identity")
 
-
-example_genes <- example_genes %>% as_tibble()

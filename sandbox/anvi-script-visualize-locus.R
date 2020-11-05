@@ -10,7 +10,7 @@
 # Load env
 library(optparse)
 library(tidyverse)
-library(gggenes)
+# library(gggenes)
 
 option_list <- list(
   make_option(
@@ -28,7 +28,7 @@ args <- parse_args(op)
 
 args$contigsdb
 
-cleanfunction()
+# cleanfunction()
 
 
 contig_db_list <- c("ST_809635352_CPS_0028.db", "ST_764588959_CPS_0011.db")

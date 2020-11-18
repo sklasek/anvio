@@ -9,7 +9,7 @@
 
 # Load env
 library(optparse)
-library(tidyverse)
+library(dplyr)
 # library(gggenes)
 
 option_list <- list(

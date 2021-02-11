@@ -541,13 +541,11 @@ class HMMERTableOutput(Parser):
         files_expected = {'hits': hmmer_table_txt}
 
         if self.context == "GENE":
-            col_info = self.get_col_info_for_DOMAIN_context()
+            # FIXME when finished, remove old get_col_info_for_GENE_context and replace with
+            # get_col_info_for_GENE2_context
+            col_info = self.get_col_info_for_GENE2_context()
         elif self.context == "CONTIG" and (self.alphabet == "DNA" or self.alphabet == "RNA"):
             col_info = self.get_col_info_for_CONTIG_context()
-        elif self.context == "DOMAIN" and self.alphabet == "AA":
-            if program != 'hmmsearch':
-                raise ConfigError("HMMScan :: the 'DOMAIN' context is only available for hmmsearch.")
-            col_info = self.get_col_info_for_DOMAIN_context()
         else:
             raise ConfigError("HMMScan driver is confused. Yor context and alphabet pair ('%s' and '%s') "
                               "does not seem to be implemented in the parser module. If you think this is "
@@ -593,24 +591,15 @@ class HMMERTableOutput(Parser):
         return col_names, col_mapping
 
 
-    def get_col_info_for_CONTIG_context(self):
+    def get_col_info_for_GENE2_context(self):
         """Get column names and types for GENE context
-
-        See class docstring for details of the fields for AA sequence search, and DNA sequence search.
-        """
-
-        # 'hmm_target', 'hmm_acc', 'query_id', 'query_acc', 'hmm_from', 'hmm_to', 'alignment_from', 'alignment_to', 'envelope_from', 'envelope_to', 'seq_len', 'strand', 'e_value', 'score', 'bias',]
-        col_names = ['gene_name', 'gene_hmm_id', 'contig_name', 'f', 'hmm_from', 'hmm_to', 'alignment_from', 'alignment_to', 'envelope_from', 'envelope_to', 'f', 'f', 'e_value', 'f', 'f']
-        col_mapping = [str, str, str, str, str, str, int, int, int, int, str, str, float, str, str]
-
-        return col_names, col_mapping
-
-
-    def get_col_info_for_DOMAIN_context(self):
-        """Get column names and types for DOMAIN context
 
         See class docstring for details of the fields
         """
+
+        # FIXME, see how the original get_col_info_for_GENE_context has different behavior depending
+        # on whether the program was hmmscan or hmmsearch? Pretty sure this is required here, too
+        # UPDATE, yes, run with --hmmer-program hmmscan and see for yourself that things get weird
 
         col_info = [
             ('gene_callers_id', int),   # target name
@@ -638,6 +627,19 @@ class HMMERTableOutput(Parser):
         ]
 
         return list(zip(*col_info))
+
+
+    def get_col_info_for_CONTIG_context(self):
+        """Get column names and types for GENE context
+
+        See class docstring for details of the fields for AA sequence search, and DNA sequence search.
+        """
+
+        # 'hmm_target', 'hmm_acc', 'query_id', 'query_acc', 'hmm_from', 'hmm_to', 'alignment_from', 'alignment_to', 'envelope_from', 'envelope_to', 'seq_len', 'strand', 'e_value', 'score', 'bias',]
+        col_names = ['gene_name', 'gene_hmm_id', 'contig_name', 'f', 'hmm_from', 'hmm_to', 'alignment_from', 'alignment_to', 'envelope_from', 'envelope_to', 'f', 'f', 'e_value', 'f', 'f']
+        col_mapping = [str, str, str, str, str, str, int, int, int, int, str, str, float, str, str]
+
+        return col_names, col_mapping
 
 
     def get_search_results(self, noise_cutoff_dict=None, return_bitscore_dict=False):

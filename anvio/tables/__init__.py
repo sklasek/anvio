@@ -103,8 +103,8 @@ hmm_hits_info_table_structure          = ['source', 'ref' , 'search_type', 'doma
 hmm_hits_info_table_types              = [ 'text' , 'text',    'text'    ,  'text' , 'text' ]       # This one here is the id that apper as in gene_calls table
                                                                                          #         /
 hmm_hits_table_name                    = 'hmm_hits'                                      # _______|_______
-hmm_hits_table_structure               = ['entry_id', 'source', 'gene_unique_identifier', 'gene_callers_id', 'gene_name', 'gene_hmm_id', 'e_value']
-hmm_hits_table_types                   = [ 'numeric',  'text' ,          'text'         ,      'numeric'   ,   'text'   ,     'text'   , 'numeric']
+hmm_hits_table_structure               = ['entry_id', 'source', 'gene_unique_identifier', 'gene_callers_id', 'gene_name', 'gene_hmm_id', 'e_value', 'bitscore', 'hmm_length', 'gene_length', 'hmm_start', 'hmm_stop', 'gene_start', 'gene_stop']
+hmm_hits_table_types                   = [ 'numeric',  'text' ,          'text'         ,      'numeric'   ,   'text'   ,     'text'   , 'numeric', 'numeric',   'numeric',     'numeric',    'numeric',   'numeric',   'numeric',   'numeric']
 
 hmm_hits_splits_table_name             = 'hmm_hits_in_splits'
 hmm_hits_splits_table_structure        = ['hmm_hit_entry_id', 'split', 'percentage_in_split', 'source']

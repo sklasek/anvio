@@ -221,7 +221,8 @@ class TablesForHMMHits(Table):
                                                       len(all_genes_searched_against),
                                                       hmm_model,
                                                       reference,
-                                                      noise_cutoff_terms)
+                                                      noise_cutoff_terms,
+                                                      out_fmt="--domtblout")
 
             if not hmm_scan_hits_txt:
                 search_results_dict = {}
@@ -394,19 +395,24 @@ class TablesForHMMHits(Table):
         # into the dictionary, so it perfectly matches to the table structure
         for entry_id in search_results_dict:
             hit = search_results_dict[entry_id]
+            # print(hit)
 
+            # print(hit)
+            # print(self.gene_calls_dict)
             gene_call = self.gene_calls_dict[hit['gene_callers_id']]
+            # print(gene_call)
+            # print(gene_call['contig'])
 
             hit['gene_unique_identifier'] = hashlib.sha224('_'.join([str(self.contigs_db_hash),
-                                                                     gene_call['contig'],
-                                                                     hit['gene_name'],
+                                                                     str(gene_call['contig']),
+                                                                     str(hit['gene_name']),
                                                                      str(gene_call['start']),
                                                                      str(gene_call['stop'])]).encode('utf-8')).hexdigest()
             hit['source'] = source
 
         database = db.DB(self.db_path, utils.get_required_version_for_db(self.db_path))
 
-        # push information about this search result into serach_info table.
+        # push information about this search result into search_info table.
         db_entries = [source, reference, kind_of_search, domain, ', '.join(all_genes)]
         database._exec('''INSERT INTO %s VALUES (?,?,?,?,?)''' % t.hmm_hits_info_table_name, db_entries)
 
@@ -415,18 +421,20 @@ class TablesForHMMHits(Table):
             database.disconnect()
             return
 
-        # then populate serach_data table for each contig.
+        # then populate search_data table for each contig.
         db_entries = []
         for hit in list(search_results_dict.values()):
             entry_id = self.next_id(t.hmm_hits_table_name)
             db_entries.append(tuple([entry_id] + [hit[h] for h in t.hmm_hits_table_structure[1:]]))
+            # print(db_entries)
             # tiny hack here: for each hit, we are generating a unique id (`entry_id`), and feeding that information
             #                 back into the dictionary to pass it to processing of splits, so each split-level
             #                 entry knows who is their parent.
             hit['hmm_hit_entry_id'] = entry_id
 
-        database._exec_many('''INSERT INTO %s VALUES (?,?,?,?,?,?,?)''' % t.hmm_hits_table_name, db_entries)
-
+        print(len(db_entries[1]))
+        database._exec_many('''INSERT INTO %s VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)''' % t.hmm_hits_table_name, db_entries)
+        print("did we make it here?")
         db_entries = self.process_splits(search_results_dict)
         database._exec_many('''INSERT INTO %s VALUES (?,?,?,?)''' % t.hmm_hits_splits_table_name, db_entries)
 

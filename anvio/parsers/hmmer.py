@@ -541,7 +541,7 @@ class HMMERTableOutput(Parser):
         files_expected = {'hits': hmmer_table_txt}
 
         if self.context == "GENE":
-            col_info = self.get_col_info_for_GENE_context()
+            col_info = self.get_col_info_for_DOMAIN_context()
         elif self.context == "CONTIG" and (self.alphabet == "DNA" or self.alphabet == "RNA"):
             col_info = self.get_col_info_for_CONTIG_context()
         elif self.context == "DOMAIN" and self.alphabet == "AA":
@@ -619,7 +619,7 @@ class HMMERTableOutput(Parser):
             ('hmm_name',        str),   # query name
             ('hmm_id',          str),   # accession
             ('hmm_length',      int),   # qlen
-            ('evalue',          float), # E-value (full sequence)
+            ('e_value',          float), # E-value (full sequence)
             ('bitscore',        float), # score (full sequence)
             ('bias',            float), # bias (full sequence)
             ('match_num',       int),   # # (this domain)
@@ -733,11 +733,28 @@ class HMMERTableOutput(Parser):
                                  'domain_bit_score': hit['dom_bit_score']}
 
                 else:
+                    # print('are we here?')
+                    # print(hit)
+                    # print(hit['hmm_length'])
+                    # print(hit['gene_length'])
+                    # print(hit['bitscore'])
+                    # print(hit['hmm_start'])
+                    # print(hit['hmm_stop'])
+                    # print(hit['gene_start'])
+                    # print(hit['gene_stop'])
+                    # print(entry_id)
                     entry = {'entry_id': entry_id,
-                             'gene_name': hit['gene_name'],
-                             'gene_hmm_id': hit['gene_hmm_id'],
+                             'gene_name': hit['hmm_name'],
                              'gene_callers_id': hit['gene_callers_id'],
-                             'e_value': hit['e_value']}
+                             'gene_hmm_id': hit['hmm_id'],
+                             'e_value': hit['e_value'],
+                             'bitscore': hit['bitscore'],
+                             'hmm_length': hit['hmm_length'],
+                             'gene_length': hit['gene_length'],
+                             'hmm_start': hit['hmm_start'],
+                             'hmm_stop': hit['hmm_stop'],
+                             'gene_start': hit['gene_start'],
+                             'gene_stop': hit['gene_stop']}
                     if return_bitscore_dict:
                         bit_score_info_dict_entry = {'entry_id': entry_id,
                                  'gene_name': hit['gene_name'],
@@ -769,5 +786,6 @@ class HMMERTableOutput(Parser):
         if return_bitscore_dict:
             return annotations_dict, bit_score_info_dict
 
+        # print(annotations_dict)
         return annotations_dict
 

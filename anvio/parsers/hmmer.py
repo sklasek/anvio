@@ -735,16 +735,14 @@ class HMMERTableOutput(Parser):
                                  'domain_bit_score': hit['dom_bit_score']}
 
                 else:
-                    # print('are we here?')
-                    # print(hit)
-                    # print(hit['hmm_length'])
-                    # print(hit['gene_length'])
-                    # print(hit['bitscore'])
-                    # print(hit['hmm_start'])
-                    # print(hit['hmm_stop'])
-                    # print(hit['gene_start'])
-                    # print(hit['gene_stop'])
-                    # print(entry_id)
+                    # FIXME this condition _happens_ to be exclusive to anvi-run-hmms. The if and
+                    # elif statements above are presumably for iva's work, however what if she
+                    # changes the design so that a noise_cutoff_dict does not have to be supplied?
+                    # Then her flow will enter this conditional, and her stuff downstream will fail.
+                    # Ideally, you should talk with iva and convince her to change her design to
+                    # include all the extra columns. That way _all_ context == 'GENE' runs will
+                    # assume the presence of all these new columns
+
                     entry = {'entry_id': entry_id,
                              'gene_name': hit['hmm_name'],
                              'gene_callers_id': hit['gene_callers_id'],

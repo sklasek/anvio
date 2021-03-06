@@ -234,9 +234,6 @@ class TablesForHMMHits(Table):
                                               desired_output=self.hmmer_desired_output,
                                               hmmer_output_dir=self.hmmer_output_dir)
 
-            if self.hmmer_output_dir:
-                self.run.info("HMMER output directory", self.hmmer_output_dir)
-
             if not isinstance(hmmer_output, tuple):
                 hmm_scan_hits_txt = hmmer_output
             else:

@@ -183,8 +183,8 @@ class HMMer:
                                   "the --domtblout parameter.")
         else:
             self.run.info('HMMer program used for search', self.program_to_use)
-        if self.hmmer_output_dir:
-            self.run.info("HMMER output directory", self.hmmer_output_dir)
+        if hmmer_output_dir:
+            self.run.info("HMMER output directory", hmmer_output_dir)
 
         tmp_dir = os.path.dirname(self.target_files_dict[target][0])
         self.run.info('Temporary work dir', tmp_dir)

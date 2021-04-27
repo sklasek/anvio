@@ -593,9 +593,10 @@ class VariabilitySuper(VariabilityFilter, object):
             self.sanity_check()
 
         # Initialize the contigs super
+        if self.splits_of_interest_path:
+            split_names_of_interest = self.get_splits_of_interest(splits_of_interest_path=self.splits_of_interest_path, split_source="split_names")
         if self.contigs_db_path and not self.table_provided:
             dbops.ContigsSuperclass.__init__(self, self.args, r=self.run, p=self.progress)
-
             if self.splits_of_interest_path:
                 split_names_of_interest = self.get_splits_of_interest(splits_of_interest_path=self.splits_of_interest_path, split_source="split_names")
             elif self.gene_caller_ids:
@@ -1458,6 +1459,16 @@ class VariabilitySuper(VariabilityFilter, object):
                                                                   len(genes_remaining),
                                                                   extra_msg),
                       mc='green')
+
+        if reason == "minimum coverage across all samples":
+            splits = self.data["split_name"].unique()
+            positions = self.data["pos"].unique()
+
+            print('Split names: ')
+            print(splits)
+            print('Number of NT positions in SCGs for fixation index calculation: ' + str(len(positions)))
+            print('position numbers: ')
+            print(positions)
 
         self.check_if_data_is_empty()
 
@@ -2947,6 +2958,7 @@ class VariabilityFixationIndex(object):
         self.variability_table_path = A('variability_profile', null)
         self.keep_negatives = A('keep_negatives', null)
         self.min_coverage_in_each_sample = A('min_coverage_in_each_sample', null)
+        self.splits_of_interest_path = A('splits_of_interest', null)
 
         min_cov_default = 10
 
@@ -3071,6 +3083,9 @@ class VariabilityFixationIndex(object):
                 raise ConfigError("After filtering, no positions remain. See the filtering summary above.")
 
         # We got our data. We don't care how we got it
+        if self.splits_of_interest_path:
+            splits_of_interest = set([c.strip().replace('\r', '') for c in open(self.splits_of_interest_path).readlines()])
+            self.v.data[self.v.data['split_name'].isin(splits_of_interest)]
         self.v.data = self.v.data[self.columns_of_interest]
         self.v.convert_counts_to_frequencies()
         self.compute_FST_matrix()

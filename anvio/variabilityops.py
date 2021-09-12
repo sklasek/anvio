@@ -2394,7 +2394,7 @@ class WrapperForFancyEngines(object):
         self.progress.new("Adding invariant sites (--kiefl-mode)")
         self.progress.update("...")
 
-        d = {
+        new_entries = {
             'entry_id': [],
             'unique_pos_identifier': [],
             'sample_id': [],
@@ -2406,7 +2406,7 @@ class WrapperForFancyEngines(object):
             'coverage': [],
             'reference': [],
         }
-        d.update({
+        new_entries.update({
             item: [] for item in self.items
         })
 
@@ -2430,21 +2430,21 @@ class WrapperForFancyEngines(object):
                     missing_sample_ids = samples_wanted - present_sample_ids
                     num_missing_samples = len(missing_sample_ids)
 
-                    d['entry_id'].extend(range(next_entry_id, next_entry_id + num_missing_samples))
-                    d['unique_pos_identifier'].extend([unique_pos_identifier]*num_missing_samples)
-                    d['sample_id'].extend(missing_sample_ids)
-                    d['corresponding_gene_call'].extend([corresponding_gene_call]*num_missing_samples)
-                    d['gene_length'].extend([gene_length]*num_missing_samples)
-                    d['codon_order_in_gene'].extend([codon_order_in_gene]*num_missing_samples)
-                    d['codon_number'].extend([codon_order_in_gene+1]*num_missing_samples)
-                    d['departure_from_reference'].extend([0]*num_missing_samples)
-                    d['coverage'].extend([1]*num_missing_samples)
-                    d['reference'].extend([reference]*num_missing_samples)
-                    d[reference].extend([1]*num_missing_samples)
+                    new_entries['entry_id'].extend(range(next_entry_id, next_entry_id + num_missing_samples))
+                    new_entries['unique_pos_identifier'].extend([unique_pos_identifier]*num_missing_samples)
+                    new_entries['sample_id'].extend(missing_sample_ids)
+                    new_entries['corresponding_gene_call'].extend([corresponding_gene_call]*num_missing_samples)
+                    new_entries['gene_length'].extend([gene_length]*num_missing_samples)
+                    new_entries['codon_order_in_gene'].extend([codon_order_in_gene]*num_missing_samples)
+                    new_entries['codon_number'].extend([codon_order_in_gene+1]*num_missing_samples)
+                    new_entries['departure_from_reference'].extend([0]*num_missing_samples)
+                    new_entries['coverage'].extend([1]*num_missing_samples)
+                    new_entries['reference'].extend([reference]*num_missing_samples)
+                    new_entries[reference].extend([1]*num_missing_samples)
                     for item in self.items:
                         if item == reference:
                             continue
-                        d[item].extend([0]*num_missing_samples)
+                        new_entries[item].extend([0]*num_missing_samples)
 
                     next_entry_id += num_missing_samples
 
@@ -2460,26 +2460,26 @@ class WrapperForFancyEngines(object):
                     # reference could be None (--engine CDN) or 0 (--engine AA) if item is ambiguous
                     # (nucleotide sequence contains at least one N)
                     continue
-                d['entry_id'].extend(range(next_entry_id, next_entry_id + num_samples))
-                d['unique_pos_identifier'].extend([next_unique_pos_identifier]*num_samples)
-                d['sample_id'].extend(samples_wanted)
-                d['corresponding_gene_call'].extend([corresponding_gene_call]*num_samples)
-                d['gene_length'].extend([gene_length]*num_samples)
-                d['codon_order_in_gene'].extend([codon_order_in_gene]*num_samples)
-                d['codon_number'].extend([codon_order_in_gene+1]*num_samples)
-                d['departure_from_reference'].extend([0]*num_samples)
-                d['coverage'].extend([1]*num_samples)
-                d['reference'].extend([reference]*num_samples)
-                d[reference].extend([1]*num_samples)
+                new_entries['entry_id'].extend(range(next_entry_id, next_entry_id + num_samples))
+                new_entries['unique_pos_identifier'].extend([next_unique_pos_identifier]*num_samples)
+                new_entries['sample_id'].extend(samples_wanted)
+                new_entries['corresponding_gene_call'].extend([corresponding_gene_call]*num_samples)
+                new_entries['gene_length'].extend([gene_length]*num_samples)
+                new_entries['codon_order_in_gene'].extend([codon_order_in_gene]*num_samples)
+                new_entries['codon_number'].extend([codon_order_in_gene+1]*num_samples)
+                new_entries['departure_from_reference'].extend([0]*num_samples)
+                new_entries['coverage'].extend([1]*num_samples)
+                new_entries['reference'].extend([reference]*num_samples)
+                new_entries[reference].extend([1]*num_samples)
                 for item in self.items:
                     if item == reference:
                         continue
-                    d[item].extend([0]*num_samples)
+                    new_entries[item].extend([0]*num_samples)
 
                 next_entry_id += num_samples
                 next_unique_pos_identifier += 1
 
-        new_entries = pd.DataFrame(d)
+        new_entries = pd.DataFrame(new_entries)
 
         # concatenate new columns to self.data
         entries_before = len(self.data.index)

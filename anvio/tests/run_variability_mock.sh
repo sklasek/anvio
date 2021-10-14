@@ -127,16 +127,37 @@ anvi-gen-variability-profile -p test-output/SAMPLES-MERGED/PROFILE.db \
 
 head test-output/variability_AA.txt
 
+INFO "anvi-gen-variability for AA (--kiefl-mode)"
+anvi-gen-variability-profile -p test-output/SAMPLES-MERGED/PROFILE.db \
+                             -c test-output/single_contig.db \
+                             -o test-output/variability_AA_kiefl.txt \
+                             --splits-of-interest test-output/splits_of_interest.txt \
+                             --kiefl-mode \
+                             --engine AA
+
+head test-output/variability_AA_kiefl.txt
+
 INFO "anvi-gen-variability for CDN"
 anvi-gen-variability-profile -p test-output/SAMPLES-MERGED/PROFILE.db \
                              -c test-output/single_contig.db \
                              -o test-output/variability_CDN.txt \
                              --gene-caller-ids 0 \
                              --quince-mode \
+                             --include-site-pnps \
                              --engine CDN
 
 head test-output/variability_CDN.txt
 
+INFO "anvi-gen-variability for CDN (--kiefl-mode)"
+anvi-gen-variability-profile -p test-output/SAMPLES-MERGED/PROFILE.db \
+                             -c test-output/single_contig.db \
+                             -o test-output/variability_CDN_kiefl.txt \
+                             --splits-of-interest test-output/splits_of_interest.txt \
+                             --include-site-pnps \
+                             --kiefl-mode \
+                             --engine CDN
+
+head test-output/variability_CDN_kiefl.txt
 
 INFO "anvi-gen-fixation-index-matrix for NT"
 anvi-gen-fixation-index-matrix -p test-output/SAMPLES-MERGED/PROFILE.db \
@@ -166,12 +187,11 @@ cat test-output/fixation_NT_external.txt
 
 INFO "anvi-gen-fixation-index-matrix for NT with external table no quince"
 rm -rf test-output/pn_ps_ratio_output
-anvi-script-calculate-pn-ps-ratio -a test-output/variability_AA.txt \
-                                  -b test-output/variability_CDN.txt \
-                                  -c test-output/single_contig.db \
-                                  -o test-output/pn_ps_ratio_output \
-                                  -m 10 \
-                                  -i 3
+anvi-get-pn-ps-ratio -V test-output/variability_CDN.txt \
+                     -c test-output/single_contig.db \
+                     -o test-output/pn_ps_ratio_output \
+                     -m 10 \
+                     -i 3
 
 INFO "anvi-gen-gene-consensus-sequences for gene mode"
 anvi-gen-gene-consensus-sequences -p test-output/SAMPLES-MERGED/PROFILE.db \

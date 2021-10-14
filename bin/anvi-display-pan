@@ -22,10 +22,9 @@ __copyright__ = "Copyleft 2015-2018, the Meren Lab (http://merenlab.org/)"
 __credits__ = []
 __license__ = "GPL 3.0"
 __version__ = anvio.__version__
-__maintainer__ = "A. Murat Eren"
-__email__ = "a.murat.eren@gmail.com"
+__authors__ = ['meren']
 __requires__ = ['pan-db', 'genomes-storage-db']
-__provides__ = ['collection', 'bin', 'interactive', 'svg']
+__provides__ = ['collection', 'bin', 'interactive', 'svg', 'gene-cluster-inspection']
 __resources__ = [("See this program in action on the pangenomics tutorial", "http://merenlab.org/2016/11/08/pangenomics-v2/#displaying-the-pan-genome")]
 __description__ = "Start an anvi'o server to display a pan-genome"
 
@@ -37,7 +36,7 @@ if __name__ == '__main__':
     parser = ArgumentParser(description=__description__)
 
     groupA = parser.add_argument_group('INPUT FILES', "Input files from the pangenome analysis.")
-    groupA.add_argument(*anvio.A('pan-db'), **anvio.K('pan-db'))
+    groupA.add_argument(*anvio.A('pan-db'), **anvio.K('pan-db', {'required': False}))
     groupA.add_argument(*anvio.A('genomes-storage'), **anvio.K('genomes-storage', {'required': False}))
 
     groupB = parser.add_argument_group('OPTIONAL INPUTS', "Where the yay factor becomes a reality.")
@@ -72,7 +71,7 @@ if __name__ == '__main__':
     groupF.add_argument(*anvio.A('password-protected'), **anvio.K('password-protected'))
     groupF.add_argument(*anvio.A('user-server-shutdown'), **anvio.K('user-server-shutdown'))
 
-    args = parser.get_args(parser)
+    args = parser.get_args(parser, auto_fill_anvio_dbs=True)
 
     try:
         args.mode = 'pan'

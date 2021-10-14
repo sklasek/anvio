@@ -42,6 +42,19 @@ anvi-gen-contigs-database -f $files/contigs.fa \
 INFO "Displaying the info for the contigs databse"
 anvi-db-info $output_dir/CONTIGS.db
 
+INFO "Rapid profiling of BAM files with anvi-profile blitz in gene mode"
+anvi-profile-blitz $output_dir/*bam \
+                   -c $output_dir/CONTIGS.db \
+                   --gene-mode \
+                   -o $output_dir/PROFILE-BLITZ-GENES.txt
+
+INFO "Rapid profiling of BAM files with anvi-profile blitz in contig mode"
+anvi-profile-blitz $output_dir/*bam \
+                   -c $output_dir/CONTIGS.db \
+                   --gene-mode \
+                   -o $output_dir/PROFILE-BLITZ-CONTIGS.txt
+SHOW_FILE $output_dir/PROFILE-BLITZ-CONTIGS.txt
+
 INFO "Setting a new self value in the self table of the contigs databse"
 anvi-db-info $output_dir/CONTIGS.db \
              --self-key 'a_new_test_key' \
@@ -61,6 +74,12 @@ INFO "Exporting contig sequences from the contigs database in 'splits mode'"
 anvi-export-contigs -c $output_dir/CONTIGS.db \
                     -o $output_dir/exported_split_sequences.fa \
                     --splits-mode
+
+INFO "Searching for sequence motifs in the contigs database"
+anvi-search-sequence-motifs -c $output_dir/CONTIGS.db \
+                            --motifs ATCG,TAAAT \
+                            --output-file $output_dir/sequence-motifs-in-contigs.txt
+SHOW_FILE $output_dir/sequence-motifs-in-contigs.txt
 
 INFO "Populating taxonomy for splits table in the database using 'centrifuge' parser"
 anvi-import-taxonomy-for-genes -c $output_dir/CONTIGS.db \
@@ -96,12 +115,13 @@ INFO "Rerunning HMMs with hmmsearch"
 anvi-run-hmms -c $output_dir/CONTIGS.db \
               -I Bacteria_71 \
               --hmmer-program hmmsearch \
-              --domtblout $output_dir/hmmsearch_domtblout \
+              --hmmer-output-dir $output_dir \
+              --domain-hits-table \
               --just-do-it
 
 INFO "Filtering hmm_hits using target coverage"
 anvi-script-filter-hmm-hits-table -c $output_dir/CONTIGS.db \
-                                  --domtblout $output_dir/hmmsearch_domtblout_domtable.txt \
+                                  --domain-hits-table $output_dir/hmm.domtable \
                                   --hmm-source Bacteria_71 \
                                   --target-coverage 0.9
 
@@ -194,6 +214,10 @@ anvi-profile -c $output_dir/CONTIGS.db \
              -S BLANK \
              --blank-profile
 
+INFO "Adding a default collection to the blank profile"
+anvi-script-add-default-collection -c $output_dir/CONTIGS.db \
+                                   -p $output_dir/BLANK-PROFILE/PROFILE.db \
+
 INFO "Importing a collection into the blank profile"
 anvi-import-collection -c $output_dir/CONTIGS.db \
                        -p $output_dir/BLANK-PROFILE/PROFILE.db \
@@ -219,11 +243,24 @@ do
     anvi-import-taxonomy-for-layers -p $output_dir/SAMPLE-$f/PROFILE.db \
                                     -i $files/example_files_for_kraken_hll_taxonomy/SAMPLE-$f.mpa \
                                     --parser krakenuniq
+
+    INFO "Importing a collection"
+    anvi-import-collection -c $output_dir/CONTIGS.db \
+                           -p $output_dir/SAMPLE-$f/PROFILE.db \
+                           -C CONCOCT \
+                           $files/concoct_mini_test.txt
 done
+
+INFO "Fast summary of the single profile databases"
+anvi-summarize-blitz $output_dir/SAMPLE-0*/PROFILE.db \
+                     -c $output_dir/CONTIGS.db \
+                     -C CONCOCT \
+                     -o $output_dir/SUMMARY-BLITZ.txt
+SHOW_FILE $output_dir/SUMMARY-BLITZ.txt
 
 # Run anvi-profile on one of the samples using the multi-process routine, just to make sure it does
 # not crash. FIXME Ideally, this step would compare the identicalness of
-# MULTI-THREAD-SAMPLE-01/PROFILE.db and SAMPLE-01/PROFILE.db 
+# MULTI-THREAD-SAMPLE-01/PROFILE.db and SAMPLE-01/PROFILE.db
 INFO "Profiling sample SAMPLE-01 with --force-multi"
 anvi-profile -i $output_dir/SAMPLE-01.bam \
              -o $output_dir/MULTI-THREAD-SAMPLE-01 \
@@ -251,7 +288,7 @@ anvi-import-collection -c $output_dir/CONTIGS.db \
 
 INFO "Update the description in the merged profile"
 anvi-update-db-description $output_dir/SAMPLES-MERGED/PROFILE.db \
-                            --description $files/example_description.md
+                           --description $files/example_description.md
 
 INFO "Generating coverages and sequences files for splits (for external binning)"
 anvi-export-splits-and-coverages -c $output_dir/CONTIGS.db \
@@ -449,6 +486,13 @@ anvi-gen-gene-level-stats-databases -c $output_dir/CONTIGS.db \
                                     -C DEFAULT \
                                     -b EVERYTHING \
                                     --inseq-stats
+
+INFO "Searching for sequence motifs in the profile database"
+anvi-search-sequence-motifs -c $output_dir/CONTIGS.db \
+                            -p $output_dir/SAMPLES-MERGED/PROFILE.db \
+                            --motifs ATCG,TAAAT \
+                            --output-file $output_dir/sequence-motifs-in-profile.txt
+SHOW_FILE $output_dir/sequence-motifs-in-profile.txt
 
 INFO "Generating normalized codon frequencies for all genes in the contigs database"
 anvi-get-codon-frequencies -c $output_dir/CONTIGS.db \
@@ -761,6 +805,13 @@ anvi-interactive -p $output_dir/SAMPLES-MERGED/PROFILE.db \
                  -b Bin_1 \
                  --gene-mode \
                  --dry-run
+
+INFO "A dry run to fill in anvi'o dbs"
+curdir=`pwd`
+cd $output_dir
+anvi-interactive --dry-run
+anvi-display-pan --dry-run
+cd $curdir
 
 INFO "Firing up the interactive interface to display the contigs db stats"
 anvi-display-contigs-stats $output_dir/CONTIGS.db \

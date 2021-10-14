@@ -21,7 +21,7 @@ anvi-gen-contigs-database -f 01.fa -o 01.db
 anvi-gen-contigs-database -f 02.fa -o 02.db
 anvi-gen-contigs-database -f 03.fa -o 03.db
 
-INFO "Running HMMs (quitely)"
+INFO "Running HMMs (quietly)"
 anvi-run-hmms -c 01.db --quiet
 anvi-run-hmms -c 02.db --quiet
 anvi-run-hmms -c 03.db --quiet
@@ -70,7 +70,7 @@ anvi-import-misc-data -p TEST/TEST-PAN.db \
                       group-information.txt
 
 INFO "Estimating enriched functions per pan group"
-anvi-compute-functional-enrichment -p TEST/TEST-PAN.db \
+anvi-compute-functional-enrichment-in-pan -p TEST/TEST-PAN.db \
                                           -g TEST-GENOMES.db \
                                           --category group \
                                           --annotation-source COG_FUNCTION \

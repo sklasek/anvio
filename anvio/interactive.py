@@ -110,6 +110,7 @@ class Interactive(ProfileSuperclass, PanSuperclass, ContigsSuperclass):
         self.just_do_it = A('just_do_it')
         self.skip_hierarchical_clustering = A('skip_hierarchical_clustering')
         self.skip_news = A('skip_news')
+        self.annotation_source_for_per_split_summary = A('annotation_source_for_per_split_summary')
 
         if self.pan_db_path and self.profile_db_path:
             raise ConfigError("You can't set both a profile database and a pan database in arguments "
@@ -192,6 +193,8 @@ class Interactive(ProfileSuperclass, PanSuperclass, ContigsSuperclass):
                 self.split_names_of_interest.update(split_names)
 
             progress.end()
+        elif self.inspect_split_name:
+            self.split_names_of_interest = set([self.inspect_split_name])
 
         if self.contigs_db_path:
             self.contigs_db_variant = utils.get_db_variant(self.contigs_db_path)
@@ -215,6 +218,9 @@ class Interactive(ProfileSuperclass, PanSuperclass, ContigsSuperclass):
                 self.mode = 'trnaseq'
             else:
                 self.mode = 'full'
+
+        if self.mode in ['full', 'collection', 'trnaseq', 'gene'] and not self.profile_db_path:
+            raise ConfigError("You must declare a profile database for this to work :(")
 
         ContigsSuperclass.__init__(self, self.args)
         self.init_splits_taxonomy(self.taxonomic_level)
@@ -692,7 +698,15 @@ class Interactive(ProfileSuperclass, PanSuperclass, ContigsSuperclass):
         self.split_sequences = None
         if self.p_meta['splits_fasta']:
             filesnpaths.is_file_fasta_formatted(self.p_meta['splits_fasta'])
-            self.split_sequences = utils.get_FASTA_file_as_dictionary(self.p_meta['splits_fasta'])
+
+            # the utils.get_FASTA_file_as_dictionary returns a dictionary, but anvi'o expects
+            # a different format when bottleroutes accesses interactive.split_sequences. so
+            # here we will first turn the naive dictionary from get_FASTA_file_as_dictionary
+            # into a dictionary with 'sequence' keys:
+            self.split_sequences = {}
+            split_sequences = utils.get_FASTA_file_as_dictionary(self.p_meta['splits_fasta'])
+            for split_name in split_sequences:
+                self.split_sequences[split_name] = {'sequence': split_sequences[split_name]}
 
             names_missing_in_FASTA = set(self.displayed_item_names_ordered) - set(self.split_sequences.keys())
             num_names_missing_in_FASTA = len(names_missing_in_FASTA)
@@ -703,8 +717,8 @@ class Interactive(ProfileSuperclass, PanSuperclass, ContigsSuperclass):
 
             # setup a mock splits_basic_info dict
             for split_id in self.displayed_item_names_ordered:
-                self.splits_basic_info[split_id] = {'length': len(self.split_sequences[split_id]),
-                                                    'gc_content': utils.get_GC_content_for_sequence(self.split_sequences[split_id])}
+                self.splits_basic_info[split_id] = {'length': len(self.split_sequences[split_id]['sequence']),
+                                                    'gc_content': utils.get_GC_content_for_sequence(self.split_sequences[split_id]['sequence'])}
 
         # create a new, empty profile database for manual operations
         if not os.path.exists(self.profile_db_path):
@@ -727,7 +741,10 @@ class Interactive(ProfileSuperclass, PanSuperclass, ContigsSuperclass):
         # read description from self table, if it is not available get_description function will return placeholder text
         self.p_meta['description'] = get_description_in_db(self.profile_db_path)
 
-        self.title = self.args.title or self.p_meta['sample_id']
+        self.title = self.title or self.p_meta['sample_id']
+
+        # did the user ask anvi'o to add an additional layer to summarize proportion of functions per split?
+        self.update_items_additional_data_with_functions_per_split_summary()
 
 
     def cluster_splits_of_interest(self):
@@ -754,7 +771,7 @@ class Interactive(ProfileSuperclass, PanSuperclass, ContigsSuperclass):
 
             clusterings[clustering_id] = {'type': 'newick', 'data': newick}
 
-        run.info('available_clusterings', list(clusterings.keys()))
+        run.info('Available clusterings', list(clusterings.keys()))
 
         return clusterings
 
@@ -829,6 +846,7 @@ class Interactive(ProfileSuperclass, PanSuperclass, ContigsSuperclass):
                               f"put together a hierarchical clustering for and display. If you think this had to work, let us know and "
                               f"we will see if we can do something to help you.")
 
+        run.warning(None, header="SUMMARY OF WHAT IS GOING ON", lc="green")
         self.run.info('Num genomes', num_genomes)
         self.run.info('Function annotation source', facc.function_annotation_source)
         self.run.info('Num unique keys', num_facc_keys)
@@ -882,29 +900,35 @@ class Interactive(ProfileSuperclass, PanSuperclass, ContigsSuperclass):
             # let's get a layer's order, too, and immediately add it to the database:
             layer_order = clustering.get_newick_tree_data_for_dict(self.views[view]['dict'], transpose=True, zero_fill_missing=True, distance=self.distance, linkage=self.linkage)
             args = argparse.Namespace(profile_db=self.profile_db_path, target_data_table="layer_orders", just_do_it=True)
-            TableForLayerOrders(args, r=terminal.Run(verbose=False)).add({f"{facc.function_annotation_source}_{view.upper()}": {'data_type': 'newick', 'data_value': layer_order}}, skip_check_names=True)
+            TableForLayerOrders(args, r=terminal.Run(verbose=False)).add({f"{view.upper()}": {'data_type': 'newick', 'data_value': layer_order}}, skip_check_names=True)
             self.layers_order_data_dict = TableForLayerOrders(args, r=terminal.Run(verbose=False)).get()
 
             # add vew tables to the database
-            view_table_structure = ['contig'] + sorted(list(facc.layer_names_considered))
-            view_table_types = ['text'] + ['numeric'] * len(facc.layer_names_considered)
             TablesForViews(self.profile_db_path).create_new_view(
-                                            data_dict=self.views[view]['dict'],
+                                            view_data=self.views[view]['dict'],
                                             table_name=f"{view}",
-                                            table_structure=view_table_structure,
-                                            table_types=view_table_types,
-                                            view_name=f"{view}")
+                                            view_name=f"{view}",
+                                            from_matrix_form=True)
 
         # let's do this here as well so our dicts are not pruned.
         self.displayed_item_names_ordered = sorted(utils.get_names_order_from_newick_tree(items_order))
 
-
         # here we will store a layer for function names in the additional data tables of the profile databse and
-        # read it back (so it is both in there for future `anvi-interactive` ops, and in here in the interactive
-        # class to visualize the information).
         args = argparse.Namespace(profile_db=self.profile_db_path, target_data_table="items", just_do_it=True)
         TableForItemAdditionalData(args, r=terminal.Run(verbose=False)).add(facc.hash_to_function_dict, [facc.function_annotation_source], skip_check_names=True)
+
+        # if we have functional enrichment analysis results for these genomes, let's add that into
+        # the database as well!
+        if facc.functional_enrichment_stats_dict:
+            TableForItemAdditionalData(args, r=terminal.Run(verbose=False)).add(facc.functional_enrichment_stats_dict, ['enrichment_score', 'unadjusted_p_value', 'adjusted_q_value', 'associated_groups'], skip_check_names=True)
+
+        # here we will read the items additional data back so it is both in there for future `anvi-interactive` ops,
+        # AND in here in the interactive class to visualize the information.
         self.items_additional_data_keys, self.items_additional_data_dict = TableForItemAdditionalData(args, r=terminal.Run(verbose=False)).get()
+
+        # everything we need is in the database now. time to add a mini state:
+        mini_state = open(os.path.join(os.path.dirname(anvio.__file__), 'data/mini-states/display-functions.json')).read()
+        TablesForStates(self.profile_db_path).store_state('default', mini_state)
 
         # create an instance of states table
         self.states_table = TablesForStates(self.profile_db_path)
@@ -943,6 +967,7 @@ class Interactive(ProfileSuperclass, PanSuperclass, ContigsSuperclass):
 
         if not self.skip_hierarchical_clustering:
             item_orders = self.cluster_splits_of_interest()
+
             default_clustering_class = constants.merged_default if self.is_merged else constants.single_default
 
             default_item_order = dbops.get_default_item_order_name(default_clustering_class, item_orders)
@@ -1300,6 +1325,9 @@ class Interactive(ProfileSuperclass, PanSuperclass, ContigsSuperclass):
                 raise ConfigError("The requested state ('%s') is not available for this run. Please see "
                                          "available states by running this program with --show-states flag." % self.state_autoload)
 
+        # did the user ask anvi'o to add an additional layer to summarize proportion of functions per split?
+        self.update_items_additional_data_with_functions_per_split_summary()
+
 
     def load_gene_mode(self):
         if not self.skip_init_functions:
@@ -1440,6 +1468,32 @@ class Interactive(ProfileSuperclass, PanSuperclass, ContigsSuperclass):
                 self.p_meta['item_orders'][clustering_id] = {'type': 'newick', 'data': open(os.path.abspath(self.tree)).read()}
                 run.info('Additional Tree', "'%s' has been added to available trees." % clustering_id)
 
+            # make sure item names in collection mode matches to the items in the user-provided tree
+            if self.mode == 'collection':
+                item_names_in_collection = set(self.collection.keys())
+                item_names_in_user_tree = set(utils.get_names_order_from_newick_tree(self.tree, names_with_only_digits_ok=True))
+                if not item_names_in_collection == item_names_in_user_tree:
+                    raise ConfigError(f"You are attempting to run the anvi'o interactive in collection mode, and you ALSO provide a "
+                                      f"tree file to organize your items. Which is all great and this is exactly what anvi'o is for. "
+                                      f"But it seems the {len(item_names_in_user_tree)} items in your tree file do not match to the "
+                                      f"{len(item_names_in_collection)} item names the '{self.collection_name}' collection  describes :/ "
+                                      f"In case it helps you solve this puzzle, here is a name that appears in your tree file: "
+                                      f"'{item_names_in_user_tree.pop()}'. And here is a name that appears in your collection: "
+                                      f"'{item_names_in_collection.pop()}'. If they look good to you, then the problem may be related to "
+                                      f"items that are only in your collection and not in your tree, or vice versa. There should be a one "
+                                      f"to one match between the two.")
+
+
+    def update_items_additional_data_with_functions_per_split_summary(self):
+        """Adds a layer of stacked bar chart for proportion of functions in split for a given source"""
+
+        if self.annotation_source_for_per_split_summary:
+            self.items_additional_data_dict, self.items_additional_data_keys = \
+                self.get_items_additional_data_for_functions_per_split_summary(self.annotation_source_for_per_split_summary,
+                                                                               split_names_of_interest=self.split_sequences.keys(),
+                                                                               data_dict=self.items_additional_data_dict,
+                                                                               keys_list=self.items_additional_data_keys)
+
 
     def search_for_functions(self, search_terms, requested_sources=None):
         search_terms = [s.strip() for s in search_terms.split(',')]
@@ -1530,6 +1584,13 @@ class Interactive(ProfileSuperclass, PanSuperclass, ContigsSuperclass):
 
         for split_name in splits_to_remove:
             self.items_additional_data_dict.pop(split_name)
+
+        # if you remove all splits from the additional data dict (say because you are in)
+        # collection mode and your `items` are bin names and not split names), make sure
+        # the items additional data keys variable reflects that fact (reported by
+        # Florentin Constancias / @fconstancias in #1705):
+        if not len(self.items_additional_data_dict):
+            self.items_additional_data_keys = []
 
         self.progress.end()
 
@@ -1721,20 +1782,20 @@ class Interactive(ProfileSuperclass, PanSuperclass, ContigsSuperclass):
         self.ids_for_already_refined_bins = set([])
 
         if anvio.DEBUG:
-            run.info('collection from db', collection_dict)
-            run.info('bins info from db', bins_info_dict)
+            run.info('collection from db', f"{collection_dict}")
+            run.info('bins info from db', f"{bins_info_dict}")
             run.info_single('')
 
-            run.info('incoming collection data', refined_bin_data)
-            run.info('incoming bins info', refined_bins_info_dict)
+            run.info('incoming collection data', f"{refined_bin_data}")
+            run.info('incoming bins info', f"{refined_bins_info_dict}")
             run.info_single('')
 
         for bin_id in refined_bin_data:
             self.ids_for_already_refined_bins.add(bin_id)
 
         if anvio.DEBUG:
-            run.info('resulting collection', collection_dict)
-            run.info('resulting bins info', bins_info_dict)
+            run.info('resulting collection', f"{collection_dict}")
+            run.info('resulting bins info', f"{bins_info_dict}")
             run.info_single('')
 
         collections.append(self.collection_name, refined_bin_data, refined_bins_info_dict, drop_collection=False)
@@ -2066,14 +2127,64 @@ class StructureInteractive(VariabilitySuper, ContigsSuperclass):
                 'max': int(FIND_MAX('coverage', buff=1))
             },
             {
-                'name': 'synonymity',
-                'title': 'Synonymity',
+                'name': 'log_pN_popular_consensus',
+                'title': 'log10(pN) [popular consensus]',
                 'as_view': True,
                 'as_filter': 'slider',
                 'data_type': 'float',
-                'step': 0.01,
-                'min': 0,
-                'max': 1,
+                'step': 1e-3,
+                'min': float(FIND_MIN('log_pN_popular_consensus', buff=1e-3)),
+                'max': float(FIND_MAX('log_pN_popular_consensus', buff=1e-3))
+            },
+            {
+                'name': 'log_pN_consensus',
+                'title': 'log10(pN) [consensus]',
+                'as_view': True,
+                'as_filter': 'slider',
+                'data_type': 'float',
+                'step': 1e-3,
+                'min': float(FIND_MIN('log_pN_consensus', buff=1e-3)),
+                'max': float(FIND_MAX('log_pN_consensus', buff=1e-3))
+            },
+            {
+                'name': 'log_pN_reference',
+                'title': 'log10(pN) [reference]',
+                'as_view': True,
+                'as_filter': 'slider',
+                'data_type': 'float',
+                'step': 1e-3,
+                'min': float(FIND_MIN('log_pN_reference', buff=1e-3)),
+                'max': float(FIND_MAX('log_pN_reference', buff=1e-3))
+            },
+            {
+                'name': 'log_pS_popular_consensus',
+                'title': 'log10(pS) [popular consensus]',
+                'as_view': True,
+                'as_filter': 'slider',
+                'data_type': 'float',
+                'step': 1e-3,
+                'min': float(FIND_MIN('log_pS_popular_consensus', buff=1e-3)),
+                'max': float(FIND_MAX('log_pS_popular_consensus', buff=1e-3))
+            },
+            {
+                'name': 'log_pS_consensus',
+                'title': 'log10(pS) [consensus]',
+                'as_view': True,
+                'as_filter': 'slider',
+                'data_type': 'float',
+                'step': 1e-3,
+                'min': float(FIND_MIN('log_pS_consensus', buff=1e-3)),
+                'max': float(FIND_MAX('log_pS_consensus', buff=1e-3))
+            },
+            {
+                'name': 'log_pS_reference',
+                'title': 'log10(pS) [reference]',
+                'as_view': True,
+                'as_filter': 'slider',
+                'data_type': 'float',
+                'step': 1e-3,
+                'min': float(FIND_MIN('log_pS_reference', buff=1e-3)),
+                'max': float(FIND_MAX('log_pS_reference', buff=1e-3))
             },
             {
                 'name': 'entropy',
@@ -2448,6 +2559,11 @@ class StructureInteractive(VariabilitySuper, ContigsSuperclass):
                 self.args.compute_gene_coverage_stats = True
                 var = variability_engines[engine](self.args, p=terminal.Progress(verbose=verbose), r=terminal.Run(verbose=verbose))
                 var.stealth_filtering = stealth
+
+                if engine == 'CDN':
+                    var.process_functions.append((var.calc_pN_pS, dict(grouping='site', comparison='reference', add_potentials=False, log_transform=True)))
+                    var.process_functions.append((var.calc_pN_pS, dict(grouping='site', comparison='consensus', add_potentials=False, log_transform=True)))
+                    var.process_functions.append((var.calc_pN_pS, dict(grouping='site', comparison='popular_consensus', add_potentials=False, log_transform=True)))
 
                 # we convert counts to frequencies so high-covered samples do not skew averaging
                 # across samples

@@ -57,6 +57,7 @@ var mcags;
 var cog_annotated = false, kegg_annotated = false;
 
 function loadAll() {
+    info("Initiated");
     $.ajaxPrefilter(function(options) {
         if (request_prefix) {
             options.url = request_prefix + options.url;
@@ -98,16 +99,19 @@ function loadAll() {
     if(state['snvs_enabled'] == null) {
         state['snvs_enabled'] = getParameterByName('show_snvs') == 'true';
     }
+
     if(state['show_highlights'] == null) state['show_highlights'] = true;
 
     var endpoint = (gene_mode ? 'charts_for_single_gene' : 'charts');
 
+    info("Sending ajax request to gather split data");
     $.ajax({
             type: 'POST',
             cache: false,
             url: '/data/' + endpoint + '/' + state['order-by'] + '/' + contig_id,
             data: {'state': JSON.stringify(state)},
             success: function(contig_data) {
+                info("Received split data from the server");
                 state = contig_data['state'];
                 page_header = contig_data.title;
                 layers = contig_data.layers;
@@ -116,6 +120,7 @@ function loadAll() {
                 variability = [];
                 indels = [];
 
+                info("Building variability table");
                 for (var i=0; i<coverage.length; i++) {
                     variability[i] = [];
                     for (var l=0; l<4; l++) {
@@ -136,6 +141,7 @@ function loadAll() {
                 competing_nucleotides = contig_data.competing_nucleotides;
                 indels = contig_data.indels;
 
+                info("Building indels table");
                 for(var i=0; i<indels.length; i++) {
                   var ikeys = Object.keys(indels[i]);
                   for(var j=0; j<ikeys.length; j++) {
@@ -197,6 +203,7 @@ function loadAll() {
                                             <input class="form-control input-sm" id="brush_end" type="text" value="${sequence.length}" size="5">\
                                     </div>`);
 
+                info("Checking for gene functional annotations");
                 geneParser = new GeneParser(genes);
                 geneParser["data"].forEach(function(gene) {
                   if(gene.functions != null) {
@@ -225,6 +232,8 @@ function loadAll() {
                 }
                 indels_enabled = maxCountOverCoverage != 0;
                 if(!indels_enabled || state['show_indels'] == null) state['show_indels'] = indels_enabled;
+                state['snv_scale_bottom'] = state['snv_scale_dir_up'] = state['snvs_enabled'] || indels_enabled;
+                if(state['fixed-y-scale'] == null) state['fixed-y-scale'] = true;
 
                 // adjust menu options
                 if(!indels_enabled && (!state['snvs_enabled'] || maxVariability==0)) {
@@ -241,6 +250,8 @@ function loadAll() {
                   }
                   if(!state['snvs_enabled'] || maxVariability==0) {
                     $('#snv_picker').hide();
+                    state['snv_scale_bottom'] = state['snv_scale_dir_up'] = false;
+                    $('#snv_scale_box, #scale_dir_box').attr("checked", "unchecked");
                     $('#settings-section-info-SNV-warning').append("Note: SNVs are disabled for this split.");
                     $('#settings-section-info-SNV-warning').show();
                   }
@@ -287,6 +298,7 @@ function loadAll() {
                   }
                   if(state['show_snvs'] && numSNVs > 1000) {
                     state['show_snvs'] = false;
+                    $("#toggle_snv_box").val("checked", "unchecked");
                     $("div.snvs-disabled").append("WARNING: A total of " + numSNVs + " SNVs were dedected on this page and are not shown to optimize perfomance. Use the settings panel to show them.");
                     $("div.snvs-disabled").fadeIn(300);
                   }
@@ -307,6 +319,9 @@ function loadAll() {
 
                 if(state['show_snvs']) $('#toggle_snv_box').attr("checked", "checked");
                 if(state['show_indels']) $('#toggle_indel_box').attr("checked", "checked");
+                if(state['snv_scale_bottom']) $("#snv_scale_box").attr("checked", "checked");
+                if(state['snv_scale_dir_up']) $("#scale_dir_box").attr("checked", "checked");
+                if(state['fixed-y-scale']) $('#fixed_ys_box').attr("checked", "checked");
                 $('#toggle_highlight_box').attr("checked", "checked");
                 $('#toggle_nucl_box').attr("checked", "checked");
 
@@ -322,7 +337,10 @@ function loadAll() {
                           success: function(response) {
                               try{
                                   clusteringData = response[1]['data'];
+                                  info("Loading ordering data");
                                   loadOrderingAdditionalData(response[1]);
+
+                                  info("Processing state data from the server");
                                   processState(state['state-name'], response[0]);
                               }catch(e){
                                   console.error("Exception thrown", e.stack);
@@ -335,6 +353,7 @@ function loadAll() {
                   });
                 }
 
+                info("Setting event listeners");
                 $('#brush_start, #brush_end').keydown(function(ev) {
                     if (ev.which == 13) {
                         let start = parseInt($('#brush_start').val());
@@ -459,6 +478,36 @@ function loadAll() {
                       });
                   if($('div.indels-disabled').length > 0) $('div.indels-disabled').remove();
                 });
+                $('#snv_scale_box').on('change', function() {
+                  waitingDialog.show('Drawing ...',
+                      {
+                          dialogSize: 'sm',
+                          onShow: function() {
+                              toggleSNVScalePosition();
+                              waitingDialog.hide();
+                          },
+                      });
+                });
+                $('#scale_dir_box').on('change', function() {
+                  waitingDialog.show('Drawing ...',
+                      {
+                          dialogSize: 'sm',
+                          onShow: function() {
+                              toggleScaleDir();
+                              waitingDialog.hide();
+                          },
+                      });
+                });
+                $('#fixed_ys_box').on('change', function() {
+                  waitingDialog.show('Drawing ...',
+                      {
+                          dialogSize: 'sm',
+                          onShow: function() {
+                              toggleFixedYScale();
+                              waitingDialog.hide();
+                          },
+                      });
+                });
                 $('#toggle_highlight_box').on('change', function() {
                   toggleHighlightBoxes();
                 });
@@ -470,6 +519,7 @@ function loadAll() {
 }
 
 function drawHighlightBoxes() {
+  info("Drawing vertical highlight boxes");
   var nucl_shown = $("#DNA_sequence").length > 0;
 
   var width = VIEWER_WIDTH * .80;
@@ -494,6 +544,7 @@ function drawHighlightBoxes() {
 }
 
 function drawAAHighlightBoxes() {
+  info("Drawing amino acid highlight boxes");
   var endpts = getGeneEndpts($('#brush_start').val(), $('#brush_end').val());
 
   $('#context-container').on('mouseover', function(e) {
@@ -532,6 +583,7 @@ function get_box_id_for_AA(aa, id_start) {
  *   - filter_to_split: if true, filters categories to only those shown in the split
  */
 function generateFunctionColorTable(fn_colors, fn_type, highlight_genes={}, filter_to_split) {
+  info("Generating gene functional annotation color table");
   var db = (function(type){
     switch(type) {
       case "COG":
@@ -629,16 +681,34 @@ function generateFunctionColorTable(fn_colors, fn_type, highlight_genes={}, filt
 }
 
 function toggleSNVs() {
+  console.log("Toggling SNV markers (" + Math.round(Date.now()/1000) + ")");
   state['show_snvs'] = !state['show_snvs'];
   createCharts(state);
 }
 
 function toggleIndels() {
+  console.log("Toggling indel markers (" + Math.round(Date.now()/1000) + ")");
   state['show_indels'] = !state['show_indels'];
   createCharts(state);
 }
 
+function toggleSNVScalePosition() {
+  state['snv_scale_bottom'] = !state['snv_scale_bottom'];
+  createCharts(state);
+}
+
+function toggleScaleDir() {
+  state['snv_scale_dir_up'] = !state['snv_scale_dir_up'];
+  createCharts(state);
+}
+
+function toggleFixedYScale() {
+  state['fixed-y-scale'] = !state['fixed-y-scale'];
+  createCharts(state);
+}
+
 function toggleHighlightBoxes() {
+  info("Togging highlight boxes");
   if(state['show_highlights']) {
     $('#highlightBoxesSvg').empty();
     $('#highlight-boxes').css('pointer-events', 'none');
@@ -713,11 +783,13 @@ function removeGeneIDColor(gene_id) {
 }
 
 function redrawArrows() {
+  info("Redrawing gene arrows");
   resetArrowMarkers();
   drawArrows(parseInt($('#brush_start').val()), parseInt($('#brush_end').val()), $('#gene_color_order').val(), gene_offset_y, Object.keys(state['highlight-genes']));
 }
 
 function resetArrowMarkers() {
+  info("Resetting arrow markers");
   $('#contextSvgDefs').empty();
 
   ["none"].concat(mcags).concat(Object.keys(state['highlight-genes'])).forEach(function(category){
@@ -743,6 +815,7 @@ function resetArrowMarkers() {
  * - fn_colors: If set, resets state to this dictionary instead of the defaults.
  */
 function resetFunctionColors(fn_colors=null) {
+  info("Resetting functional annotation colors");
   if($('#gene_color_order') == null) return;
 
   switch($('#gene_color_order').val()) {
@@ -772,6 +845,7 @@ function toggleShowCagsInSplit() {
 }
 
 function toggle_nucleotide_display() {
+  info("Toggling nucleotide display");
   show_nucleotides = !show_nucleotides;
   if(show_nucleotides) {
     display_nucleotides();
@@ -794,6 +868,7 @@ function toggle_nucleotide_display() {
  * http://software.broadinstitute.org/software/igv/
  */
 function display_nucleotides() {
+  info("Drawing nucleotides");
   if(!show_nucleotides) return;
 
   contextSvg.select("#DNA_sequence").remove();
@@ -987,6 +1062,7 @@ function show_selected_sequence() {
 }
 
 function computeGCContent(window_size, step_size) {
+    info("Computing GC content");
     let gc_array = [];
     let padding = parseInt(window_size / 2);
 
@@ -1027,6 +1103,7 @@ function showOverlayGCContentDialog() {
 
 
 function applyOverlayGCContent() {
+    info("Applying GC content overlay");
     let gc_overlay_settings = {
         'gc_window_size': $('#gc_window_size').val(),
         'gc_step_size': $('#gc_step_size').val(),
@@ -1039,6 +1116,7 @@ function applyOverlayGCContent() {
 
 
 function resetOverlayGCContent() {
+    info("Resetting GC content overlay");
     delete sessionStorage.gc_overlay_settings;
     createCharts(state);
 }
@@ -1095,6 +1173,7 @@ function showSetMaxValuesDialog() {
 }
 
 function applyMaxValues() {
+    info("Applying max values");
     var max_values = []
     $('#setMaxValuesDialog .modal-body tbody tr').each(function(index, row) {
         max_values.push(parseInt($(row).find('td:last input').val()));
@@ -1106,6 +1185,7 @@ function applyMaxValues() {
 
 
 function resetMaxValues() {
+    info("Resetting max values");
     delete sessionStorage.max_coverage;
     createCharts(state);
 }
@@ -1369,9 +1449,9 @@ function saveState()
   */
 function processState(state_name, state) {
     // set color defaults
-    if(!state['cog-colors']) state['source-colors'] = default_source_colors;
+    if(!state['source-colors']) state['source-colors'] = default_source_colors;
     if(!state['cog-colors']) state['cog-colors'] = default_COG_colors;
-    if(!state['cog-colors']) state['kegg-colors'] = default_KEGG_colors;
+    if(!state['kegg-colors']) state['kegg-colors'] = default_KEGG_colors;
 
     if(JSON.parse(localStorage.state) && JSON.parse(localStorage.state)['gene-fn-db']) {
       state['gene-fn-db'] = JSON.parse(localStorage.state)['gene-fn-db'];
@@ -1387,6 +1467,7 @@ function processState(state_name, state) {
     if(!state['highlight-genes']) {
       state['highlight-genes'] = {};
     }
+    if(!state['show_highlights']) state['show_highlights'] = true;
 
     // define arrow markers for highlighted gene ids
     Object.keys(state['highlight-genes']).forEach(function(gene_id){
@@ -1411,6 +1492,13 @@ function processState(state_name, state) {
       $('#largeIndelInput').val(20);
       //$('#minIndelInput').val(0);
     }
+
+    state['show_highlights'] = $('#toggle_highlight_box').val() == "on";
+    state['show_snvs'] = $('#toggle_snv_box').val() == "on";
+    state['show_indels'] = $('#toggle_indel_box').val() == "on";
+    state['snv_scale_bottom'] = $('#snv_scale_box').val() == "on";
+    state['snv_scale_dir_up'] = $('#scale_dir_box').val() == "on";
+    state['fixed-y-scale'] = $('#fixed_ys_box').val() == "on";
 
     state['state-name'] = current_state_name = state_name;
 
@@ -1439,7 +1527,7 @@ function serializeSettings() {
 function createCharts(state){
     /* Adapted from Tyler Craft's Multiple area charts with D3.js article:
     http://tympanus.net/codrops/2012/08/29/multiple-area-charts-with-d3-js/  */
-    $('#chart-container, #context-container, #highlight-boxes').empty();
+    $('#chart-container, #context-container, #highlight-boxes, #sample-titles').empty();
 
     if (state['current-view'] == "single"){
         // if we are working with a non-merged single profile, we need to do some ugly hacks here,
@@ -1467,7 +1555,7 @@ function createCharts(state){
     var width = VIEWER_WIDTH * .80;
     var chartHeight = 200;
     var height = ((chartHeight + 10) * visible_layers);
-    curr_height = height;
+    curr_height = height + 10;
     var contextHeight = 50;
     var contextWidth = width;
 
@@ -1487,11 +1575,17 @@ function createCharts(state){
     $('#SNV-boxes').css("height", height + "px");
     $('#SNV-boxes').css("top", (margin.top - 20) + "px");
 
+    var samplesSvg = d3.select("#sample-titles").append("svg")
+                            .attr("id", "samplesSvg")
+                            .attr("width", width + margin.left + margin.right)
+                            .attr("height", height + margin.top);
+    $('#sample-titles').css("top", (margin.top - 20) + "px");
 
     charts = [];
 
     var layersCount = layers.length;
 
+    info("Plotting coverage");
     coverage.forEach(function(d) {
         for (var prop in d) {
             if (d.hasOwnProperty(prop)) {
@@ -1511,6 +1605,7 @@ function createCharts(state){
     let gc_content_window_size = 100;
     let gc_content_step_size = 10;
 
+    info("Parsing GC overlay settings");
     if (typeof sessionStorage.gc_overlay_settings !== 'undefined') {
         let gc_overlay_settings = JSON.parse(sessionStorage.gc_overlay_settings);
         gc_content_window_size = parseInt(gc_overlay_settings['gc_window_size']);
@@ -1519,6 +1614,7 @@ function createCharts(state){
         gc_overlay_color = gc_overlay_settings['gc_overlay_color'];
     }
 
+    info("Drawing layers");
     var j=0;
     for(var i = 0; i < layersCount; i++){
         var layer_index = layers.indexOf(layers_ordered[i]);
@@ -1548,6 +1644,7 @@ function createCharts(state){
                         maxCountOverCoverage: maxCountOverCoverage,
                         svg: svg,
                         snv_svg: snvBoxesSvg,
+                        samples_svg: samplesSvg,
                         margin: margin,
                         showBottomAxis: (j == visible_layers - 1),
                         color: state['layers'][layers[layer_index]]['color']
@@ -1714,6 +1811,7 @@ function Chart(options){
     this.maxCountOverCoverage = options.maxCountOverCoverage;
     this.svg = options.svg;
     this.snv_svg = options.snv_svg;
+    this.samples_svg = options.samples_svg;
     this.id = options.id;
     this.name = options.name;
     this.margin = options.margin;
@@ -1743,7 +1841,7 @@ function Chart(options){
     this.maxGCContent = gc_min_max['Min'];
     this.minGCContent = gc_min_max['Max'];
 
-    let yScaleMax = Math.max(this.maxVariability, this.maxCountOverCoverage);
+    let yScaleMax = state['fixed-y-scale'] ? 1 : Math.max(this.maxVariability, this.maxCountOverCoverage);
 
     this.yScale = d3.scale.linear()
                             .range([this.height,0])
@@ -1764,8 +1862,8 @@ function Chart(options){
 
     var xS = this.xScale;
     var yS = this.yScale;
-    var ySL = this.yScaleLine;
-    var ySLR = yScaleLineReverse;
+    var ySL_SNV = state['snv_scale_bottom'] ?  this.yScaleLine : yScaleLineReverse;
+    var ySL_indel = state['snv_scale_bottom'] ? yScaleLineReverse : this.yScaleLine;
     var yGC = this.yScaleGC;
 
     this.area = d3.svg.area()
@@ -1775,13 +1873,13 @@ function Chart(options){
     if(indels_enabled) {
       this.line = d3.svg.line()
                               .x(function(d, i) { return xS(1+i)+4; })
-                              .y(function(d, i) { if(i == 0) return ySL(0); if(i == num_data_points - 1) return ySL(0); return ySL(d); })
+                              .y(function(d, i) { if(i == 0) return ySL_indel(0); if(i == num_data_points - 1) return ySL_indel(0); return ySL_indel(d); })
                               .interpolate('step-before');
     }
 
     this.reverseLine = d3.svg.line()
                             .x(function(d, i) { return xS(1+i); })
-                            .y(function(d, i) { if(i == 0) return ySLR(0); if(i == num_data_points - 1) return ySLR(0); return ySLR(d); })
+                            .y(function(d, i) { if(i == 0) return ySL_SNV(0); if(i == num_data_points - 1) return ySL_SNV(0); return ySL_SNV(d); })
                             .interpolate('step-before');
 
 
@@ -1807,6 +1905,10 @@ function Chart(options){
                         .attr("transform", "translate(" + this.margin.left + "," + (this.margin.top + (this.height * this.id) + (10 * this.id)) + ")");
 
     this.textContainerIndels = this.snv_svg.append("g")
+                              .attr('class',this.name.toLowerCase())
+                              .attr("transform", "translate(" + this.margin.left + "," + (this.margin.top + (this.height * this.id) + (10 * this.id)) + ")");
+
+    this.sampleTextContainer = this.samples_svg.append("g")
                               .attr('class',this.name.toLowerCase())
                               .attr("transform", "translate(" + this.margin.left + "," + (this.margin.top + (this.height * this.id) + (10 * this.id)) + ")");
 
@@ -1860,13 +1962,14 @@ function Chart(options){
             .style("stroke-width", "0.2")
             .attr("d", this.reverseLine);
 
+        info("Drawing SNV markers");
         this.textContainer.selectAll("text")
                                 .data(d3.entries(this.competing_nucleotides))
                                 .enter()
                                 .append("text")
                                 .attr("class", "SNV_text")
                                 .attr("x", function (d) { return xS(0.5+parseInt(d.key)); })
-                                .attr("y", function (d) { return 0; })
+                                .attr("y", function (d) { return ySL_SNV(0) > 0 ? ySL_SNV(0) - 10 : ySL_SNV(0); })
                                 .attr("writing-mode", "tb")
                                 .attr("font-size", "5px")
                                 .attr("glyph-orientation-vertical", "0")
@@ -1988,6 +2091,7 @@ function Chart(options){
           .attr("d", this.line);
 
       // add text to text container based on type, and data-content based on other variables
+      info("Drawing indel markers");
       this.textContainerIndels.selectAll("text")
                               .data(d3.entries(this.indels))
                               .enter()
@@ -1995,7 +2099,7 @@ function Chart(options){
                               //.filter(function(d){ return d.value['coverage'] >= state['min-indel-coverage']})
                               .attr("class", "indels_text")
                               .attr("x", function (d) { return xS(0.5+d.value['pos']); })
-                              .attr("y", function (d) { return ySL(0); })
+                              .attr("y", function (d) { return ySL_indel(0); })
                               .attr("font-size", "14px")
                               .attr("style", "cursor:pointer;")
                               .attr("fill", function(d) { return (((d.value['pos'] in mult_indels ? mult_indels[d.value['pos']][2] : d.value['length']) > state['large-indel']) ? 'red' : '#CCCC00'); })
@@ -2040,7 +2144,7 @@ function Chart(options){
 
 
     this.yAxis = d3.svg.axis().scale(this.yScale).orient("left").ticks(5);
-    this.yAxisLine = d3.svg.axis().scale(this.yScaleLine).orient("right").ticks(5);
+    this.yAxisLine = d3.svg.axis().scale(state['snv_scale_dir_up'] ? this.yScaleLine : yScaleLineReverse).orient("right").ticks(5);
 
     this.chartContainer.append("g")
                    .attr("class", "y axis noselect")
@@ -2054,7 +2158,7 @@ function Chart(options){
                      .call(this.yAxisLine);
     }
 
-    this.chartContainer.append("text")
+    this.sampleTextContainer.append("text")
                    .attr("class","sample-title")
                    .attr("transform", "translate(0,20)")
                    .text(this.name);

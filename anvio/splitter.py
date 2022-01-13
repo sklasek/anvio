@@ -1272,14 +1272,21 @@ class LocusSplitter:
 
 
     def cut_operon(self, locus_gene_calls_dict=None, gene_callers_id=None):
-        """
-        Make sorted list of gene features needed to predict operon end
-        - gene_callers_id
-        - start, stop (sort by start)
-        - transcriptional direction
-        - intergenic space
+        """Takes a gene_calls_dict and attempts to identify an operon surrounding the
+        an anchor gene-caller-id i.e. removes non-operonic genes from the gene_calls_dict
+
+        Returns
+        =======
+        output : gene_calls_dict (trimmed)
+
+        Notes
+        =====
+        - This method finds operon boundaries iterating upstream and downstream of the anchor gene
+        to identify operonic features e.g. transcription co-directionality, intergenic distance
+        - In the future, it would be great to predict downstream promoters and transcriptional binding sites
         """
 
+        # Make list of gene features needed to predict operon boundaries sorted by gene start position
         gene_features_list = []
         for key,value in locus_gene_calls_dict.items():
             gene_caller_id = key
@@ -1291,13 +1298,6 @@ class LocusSplitter:
 
         target_gene_direction = locus_gene_calls_dict[gene_callers_id]['direction']
         gene_features_list_sorted = sorted(gene_features_list, key=lambda tup: tup[1])
-
-        # get index of the target gene
-        counter = 0
-        for item in gene_features_list_sorted:
-            if gene_callers_id in item:
-                target_index = counter
-            counter += 1
 
         # Calculate intergenic distance
         counter = 1
@@ -1315,6 +1315,13 @@ class LocusSplitter:
         # Trim based on transcriptional direction 
         #----------------------------------------
 
+        # get index of the target gene
+        counter = 0
+        for item in gene_features_list_sorted:
+            if gene_callers_id in item:
+                target_index = counter
+            counter += 1
+
         # forward
         gene_features_list_td_trimmed = []
         for item in gene_features_list_sorted[target_index:]:
@@ -1331,15 +1338,18 @@ class LocusSplitter:
                 break 
 
         # Trim based on intergenic distance
-        #----------------------------------------
+        #----------------------------------
 
-        # Make new target gene index
+        # Make new target gene index since we may have a smaller list of genes now
         gene_features_list_td_trimmed_sorted = sorted(gene_features_list_td_trimmed, key=lambda tup: tup[1]) 
         counter = 0
         for item in gene_features_list_td_trimmed_sorted:
             if gene_callers_id in item:
                 target_index = counter
             counter += 1
+        
+        # FIXME:
+        # This is where we can have a smarter way of defining outlier intergenic distance values
 
         # forward
         gene_features_list_sorted_id_trimmed = []

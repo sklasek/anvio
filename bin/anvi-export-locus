@@ -88,6 +88,7 @@ if __name__ == '__main__':
     groupD.add_argument('--use-hmm', default = False, action='store_true', help='Use HMM hits instead of functional annotations. \
                             In other words, --search-term will be queried against HMM source annotations, NOT functional annotations. \
                             If you choose this option, you must also say which HMM source to use.')
+    groupD.add_argument('--trim-operon', default = False, action='store_true', help='Predict the end of an operon here!')
     groupD.add_argument(*anvio.A('hmm-sources'), **anvio.K('hmm-sources'))
     groupD.add_argument(*anvio.A('list-hmm-sources'), **anvio.K('list-hmm-sources'))
     groupD.add_argument(*anvio.A('annotation-sources'), **anvio.K('annotation-sources'))

@@ -9,6 +9,7 @@ import os
 import sys
 import copy
 import argparse
+import statistics
 
 from collections import Counter
 
@@ -714,6 +715,7 @@ class LocusSplitter:
         self.reverse_complement_if_necessary = not A('never_reverse_complement')
         self.include_fasta_output = True
         self.is_in_flank_mode = bool(A('flank_mode'))
+        self.trim_operon = bool(A('trim_operon'))
 
         if self.annotation_sources:
             self.annotation_sources = self.annotation_sources.split(self.delimiter)
@@ -1131,10 +1133,11 @@ class LocusSplitter:
                                        locus_sequence,
                                        locus_gene_calls_dict,
                                        output_path_prefix,
+                                       gene_callers_id,
                                        reverse_complement)
 
 
-    def store_locus_as_contigs_db(self, contig_name, sequence, gene_calls, output_path_prefix, reverse_complement=False):
+    def store_locus_as_contigs_db(self, contig_name, sequence, gene_calls, output_path_prefix, gene_callers_id, reverse_complement=False):
         """Generates a contigs database and a blank profile for a given locus"""
 
         temporary_files = []
@@ -1180,6 +1183,8 @@ class LocusSplitter:
                 new_gene_calls[g] = gene_call
             gene_calls = new_gene_calls
 
+        if self.trim_operon:
+            gene_calls = self.cut_operon(gene_calls, gene_caller_id_conversion_dict[gene_callers_id])
 
         # write the sequence as a temporary FASTA file since the design of ContigsDatabase::create
         # will work seamlessly with this approach:
@@ -1264,3 +1269,95 @@ class LocusSplitter:
             self.run.info_single("Temp output files were kept for inspection due to --debug")
         else:
             [os.remove(f) for f in temporary_files]
+
+
+    def cut_operon(self, locus_gene_calls_dict=None, gene_callers_id=None):
+        """
+        Make sorted list of gene features needed to predict operon end
+        - gene_callers_id
+        - start, stop (sort by start)
+        - transcriptional direction
+        - intergenic space
+        """
+
+        gene_features_list = []
+        for key,value in locus_gene_calls_dict.items():
+            gene_caller_id = key
+            start = value['start']
+            stop = value['stop']
+            direction = value['direction']
+            features = [gene_caller_id, start, stop, direction]
+            gene_features_list.append(features)
+
+        target_gene_direction = locus_gene_calls_dict[gene_callers_id]['direction']
+        gene_features_list_sorted = sorted(gene_features_list, key=lambda tup: tup[1])
+
+        # get index of the target gene
+        counter = 0
+        for item in gene_features_list_sorted:
+            if gene_callers_id in item:
+                target_index = counter
+            counter += 1
+
+        # Calculate intergenic distance
+        counter = 1
+        for item in gene_features_list_sorted:
+            proximal_gene_start = gene_features_list_sorted[counter][1]
+            gene_stop = item[2]
+            intergenic_distance = proximal_gene_start - gene_stop
+            if intergenic_distance < 0:
+                intergenic_distance = 0
+            item.append(intergenic_distance)
+            counter += 1
+            if counter == len(gene_features_list_sorted):
+                break
+        
+        # Trim based on transcriptional direction 
+        #----------------------------------------
+
+        # forward
+        gene_features_list_td_trimmed = []
+        for item in gene_features_list_sorted[target_index:]:
+            if item[3] == target_gene_direction:
+                gene_features_list_td_trimmed.append(item)
+            else:
+                break 
+
+        # reverse
+        for item in sorted(gene_features_list_sorted[:target_index], key=lambda tup: tup[1], reverse=True):
+            if item[3] == target_gene_direction:
+                gene_features_list_td_trimmed.append(item)
+            else:
+                break 
+
+        # Trim based on intergenic distance
+        #----------------------------------------
+
+        # Make new target gene index
+        gene_features_list_td_trimmed_sorted = sorted(gene_features_list_td_trimmed, key=lambda tup: tup[1]) 
+        counter = 0
+        for item in gene_features_list_td_trimmed_sorted:
+            if gene_callers_id in item:
+                target_index = counter
+            counter += 1
+
+        # forward
+        gene_features_list_sorted_id_trimmed = []
+        for item in gene_features_list_td_trimmed_sorted[target_index:]:
+            if item[4] > 200:
+                pass
+            else:
+                gene_features_list_sorted_id_trimmed.append(item)
+
+        # reverse
+        for item in sorted(gene_features_list_td_trimmed_sorted[:target_index], key=lambda tup: tup[1], reverse=True):
+            if item[4] > 200:
+                break
+
+        # Extract final list of gene-caller-ids
+        final_trimmed_gene_caller_ids = [item[0] for item in gene_features_list_sorted_id_trimmed]
+
+        # Subset locus_gene_calls_dict
+        locus_gene_calls_dict = {key: locus_gene_calls_dict[key] for key in final_trimmed_gene_caller_ids}
+
+        return locus_gene_calls_dict

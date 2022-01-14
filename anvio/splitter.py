@@ -783,6 +783,9 @@ class LocusSplitter:
                 self.run.info('Genes to report', '%d genes before the matching gene, and %d that follow' % (self.num_genes_list[0], self.num_genes_list[1]))
             else:
                 self.run.info('Genes to report', 'Matching gene, and %d genes after it' % (self.num_genes_list[0]))
+        
+        if self.trim_operon and self.is_in_flank_mode:
+            raise ConfigError("--trim-operon cannot be performed in flank-mode.")
 
         self.run.warning(None, header="Input / Output", lc="cyan")
         self.run.info('Contigs DB', os.path.abspath(self.input_contigs_db_path))
@@ -1300,25 +1303,23 @@ class LocusSplitter:
         gene_features_list_sorted = sorted(gene_features_list, key=lambda tup: tup[1])
 
         # Calculate intergenic distance
-        counter = 1
-        for item in gene_features_list_sorted:
-            proximal_gene_start = gene_features_list_sorted[counter][1]
-            gene_stop = item[2]
+        for index in range(0,len(gene_features_list_sorted)):
+            proximal_gene_start = gene_features_list_sorted[index + 1][1]
+            gene_stop = gene_features_list_sorted[index][2]
             intergenic_distance = proximal_gene_start - gene_stop
             if intergenic_distance < 0:
                 intergenic_distance = 0
-            item.append(intergenic_distance)
-            counter += 1
-            if counter == len(gene_features_list_sorted):
+            gene_features_list_sorted[index].append(intergenic_distance)
+            if index == len(gene_features_list_sorted) - 2:
                 break
-        
+            
         # Trim based on transcriptional direction 
         #----------------------------------------
 
         # get index of the target gene
         counter = 0
         for item in gene_features_list_sorted:
-            if gene_callers_id in item:
+            if gene_callers_id == item[0]:
                 target_index = counter
             counter += 1
 
@@ -1353,16 +1354,20 @@ class LocusSplitter:
 
         # forward
         gene_features_list_sorted_id_trimmed = []
+
         for item in gene_features_list_td_trimmed_sorted[target_index:]:
+            print(item)
             if item[4] > 200:
-                pass
+                break
             else:
                 gene_features_list_sorted_id_trimmed.append(item)
 
         # reverse
-        for item in sorted(gene_features_list_td_trimmed_sorted[:target_index], key=lambda tup: tup[1], reverse=True):
-            if item[4] > 200:
+        for index in reversed(range(len(gene_features_list_td_trimmed_sorted[:target_index]))):
+            if gene_features_list_td_trimmed_sorted[index][4] > 200:
                 break
+            else:
+                gene_features_list_sorted_id_trimmed.append(gene_features_list_td_trimmed_sorted[index])
 
         # Extract final list of gene-caller-ids
         final_trimmed_gene_caller_ids = [item[0] for item in gene_features_list_sorted_id_trimmed]

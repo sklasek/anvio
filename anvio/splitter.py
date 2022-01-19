@@ -1357,7 +1357,8 @@ class LocusSplitter:
 
         for item in gene_features_list_td_trimmed_sorted[target_index:]:
             print(item)
-            if item[4] > 200:
+            if item[4] > 300:
+                gene_features_list_sorted_id_trimmed.append(item)
                 break
             else:
                 gene_features_list_sorted_id_trimmed.append(item)

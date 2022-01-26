@@ -716,6 +716,7 @@ class LocusSplitter:
         self.include_fasta_output = True
         self.is_in_flank_mode = bool(A('flank_mode'))
         self.trim_operon = bool(A('trim_operon'))
+        self.intergenic_distance = int(A('intergenic_distance'))
 
         if self.annotation_sources:
             self.annotation_sources = self.annotation_sources.split(self.delimiter)
@@ -786,6 +787,10 @@ class LocusSplitter:
         
         if self.trim_operon and self.is_in_flank_mode:
             raise ConfigError("--trim-operon cannot be performed in flank-mode.")
+        
+        if self.intergenic_distance < 0:
+            raise ConfigError("An intergenic space less than 0, what is this a viral genome?? 🦠 "
+                              "Please make it a positive value :)")
 
         self.run.warning(None, header="Input / Output", lc="cyan")
         self.run.info('Contigs DB', os.path.abspath(self.input_contigs_db_path))
@@ -1356,8 +1361,7 @@ class LocusSplitter:
         gene_features_list_sorted_id_trimmed = []
 
         for item in gene_features_list_td_trimmed_sorted[target_index:]:
-            print(item)
-            if item[4] > 300:
+            if item[4] > self.intergenic_distance:
                 gene_features_list_sorted_id_trimmed.append(item)
                 break
             else:
@@ -1365,7 +1369,7 @@ class LocusSplitter:
 
         # reverse
         for index in reversed(range(len(gene_features_list_td_trimmed_sorted[:target_index]))):
-            if gene_features_list_td_trimmed_sorted[index][4] > 200:
+            if gene_features_list_td_trimmed_sorted[index][4] > self.intergenic_distance:
                 break
             else:
                 gene_features_list_sorted_id_trimmed.append(gene_features_list_td_trimmed_sorted[index])

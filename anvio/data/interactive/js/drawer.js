@@ -723,10 +723,12 @@ Drawer.prototype.draw_tree = function() {
         while (p != null) {
             if (p.IsLeaf())
             {
+                console.log(`now drawing leaf id ${p.id} of ${this.tree.leaves.length} total leaves`)
                 this.draw_leaf(p);
             }
             else
             {
+                console.log(`now drawing node id ${p.id} of ${this.tree.leaves.length} total leaves`)
                 this.draw_internal_node(p);
             }
 
@@ -736,6 +738,7 @@ Drawer.prototype.draw_tree = function() {
         for (var i=0; i < this.tree.leaves.length; i++) {
             var p = this.tree.leaves[i];
             p.backarc = p.xy;
+            console.log(`now drawing leaf ${i} of ${this.tree.leaves.length}`)
             this.draw_leaf(p);
         }
     }

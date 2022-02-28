@@ -1222,6 +1222,7 @@ function buildLayersTable(order, settings)
                     var _unique_items = [];
                     for (var _pos = 1; _pos < layerdata.length; _pos++)
                     {
+                        console.log(`building cat layer table row ${_pos} of ${layerdata.length}`)
                         if (_unique_items.indexOf(layerdata[_pos][layer_id]) === -1)
                             _unique_items.push(layerdata[_pos][layer_id]);
 

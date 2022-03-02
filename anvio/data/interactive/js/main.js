@@ -80,7 +80,7 @@ var bbox;
 var a_display_is_drawn = false;
 var max_branch_support_value_seen = null;
 var min_branch_support_value_seen = null;
-
+var GLOBAL_ITERATOR = 0
 var request_prefix = getParameterByName('request_prefix');
 //---------------------------------------------------------
 //  Init
@@ -519,9 +519,9 @@ function changeViewData(view_data) {
 
     $("#tbody_layers").empty();
 
-    buildLayersTable(layer_order, views[current_view]);
-    populateColorDicts();
-    buildLegendTables();
+    // buildLayersTable(layer_order, views[current_view]);
+    // populateColorDicts();
+    // buildLegendTables();
 }
 
 
@@ -700,6 +700,8 @@ function buildLegendTables() {
 
     for (let pindex in categorical_data_colors)
     {
+        GLOBAL_ITERATOR += 1
+        console.log(`build legends table has iterated ${GLOBAL_ITERATOR} times`)
         var names = Object.keys(categorical_stats[pindex]).sort(function(a,b){return categorical_stats[pindex][b]-categorical_stats[pindex][a]});
 
         names.push(names.splice(names.indexOf('None'), 1)[0]); // move null and empty categorical items to end
@@ -716,6 +718,8 @@ function buildLegendTables() {
 
     for (pindex in stack_bar_colors)
     {
+        GLOBAL_ITERATOR += 1
+        console.log(`build legends table has iterated ${GLOBAL_ITERATOR} times`)
         var layer_name = getLayerName(pindex);
         var names = (layer_name.indexOf('!') > -1) ? layer_name.split('!')[1].split(';') : layer_name.split(';');
         var pretty_name = getLayerName(pindex);
@@ -734,6 +738,8 @@ function buildLegendTables() {
     for (let group in samples_categorical_colors) {
         for (let sample in samples_categorical_colors[group])
         {
+            GLOBAL_ITERATOR += 1
+            console.log(`build legends table has iterated ${GLOBAL_ITERATOR} times`)
             var names = Object.keys(samples_categorical_colors[group][sample]);
 
             legends.push({
@@ -751,6 +757,8 @@ function buildLegendTables() {
     for (let group in samples_stack_bar_colors) {
         for (let sample in samples_stack_bar_colors[group])
         {
+            GLOBAL_ITERATOR += 1
+            console.log(`build legends table has iterated ${GLOBAL_ITERATOR} times`)
             var names = (sample.indexOf('!') > -1) ? sample.split('!')[1].split(';') : sample.split(';');
             var pretty_name = (sample.indexOf('!') > -1) ? sample.split('!')[0] : sample;
 
@@ -768,6 +776,8 @@ function buildLegendTables() {
 
     for (var i=0; i < legends.length; i++)
     {
+        GLOBAL_ITERATOR += 1
+        console.log(`build legends table has iterated ${GLOBAL_ITERATOR} times`)
         var legend = legends[i];
         var template = '<span>';
 
@@ -2459,6 +2469,7 @@ function processState(state_name, state) {
         {
             if ($.inArray(i, layer_order) === -1)
             {
+                console.log(`adding additional layer ${i}`)
                 layer_order.push(i);
             }
         }
@@ -2770,7 +2781,7 @@ function processState(state_name, state) {
     }
 
     populateColorDicts();
-    buildLegendTables();
+    // buildLegendTables();
 
     current_state_name = state_name;
     toastr.success("State '" + current_state_name + "' successfully loaded.");

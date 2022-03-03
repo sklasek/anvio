@@ -861,7 +861,7 @@ if M.samples_txt_file:
         """Run metagenomics workflow to profile HMM_hits"""
 
         version: 1.0
-        log: "ECOPHYLO_WORKFLOW/METAGENOMICS_WORKFLOW/00_LOGS/run_metagenomics_workflow.log"
+        log: "ECOPHYLO_WORKFLOW/METAGENOMICS_WORKFLOW/00_LOGS/run_metagenomics_workflow_1.log"
         input:
             config = rules.make_metagenomics_config_file.output.config,
         output:
@@ -878,11 +878,10 @@ if M.samples_txt_file:
             samples_txt_new['r2'] = samples_txt_new['r2'].apply(lambda x: os.path.abspath(str(x)))
             samples_txt_new.to_csv(samples_txt_new_path, sep="\t", index=False, header=True)
 
-            # shell("mkdir -p ECOPHYLO_WORKFLOW/METAGENOMICS_WORKFLOW/00_LOGS")
-            metagenomics_log = "00_LOGS/run_metagenomics_workflow.log"
+            metagenomics_log = "00_LOGS/run_metagenomics_workflow_2.log"
 
             if M.clusterize_metagenomics_workflow == True:
-                shell(f"cd ECOPHYLO_WORKFLOW/METAGENOMICS_WORKFLOW/ && anvi-run-workflow -w metagenomics -c metagenomics_config.json --additional-params --cluster 'clusterize -j={{rule}} -o={{metagenomics_log}} -n={{threads}} -x' --cores 200 --resource nodes=200 --latency-wait 100 --keep-going --rerun-incomplete &> 00_LOGS/run_metagenomics_workflow.log && cd -")
+                shell(f"cd ECOPHYLO_WORKFLOW/METAGENOMICS_WORKFLOW/ && anvi-run-workflow -w metagenomics -c metagenomics_config.json --additional-params --cluster 'clusterize -j={{rule}} -o={metagenomics_log} -n={{threads}} -x' --cores 200 --resource nodes=200 --latency-wait 100 --keep-going --rerun-incomplete &> {metagenomics_log} && cd -")
             elif M.metagenomics_workflow_HPC_string:
                 HPC_string = params.HPC_string
                 shell(f'cd ECOPHYLO_WORKFLOW/METAGENOMICS_WORKFLOW/ && anvi-run-workflow -w metagenomics -c metagenomics_config.json --additional-params --cluster "{HPC_string}" --cores 201 --resource nodes=200 --latency-wait 100 --keep-going --rerun-incomplete &> 00_LOGS/run_metagenomics_workflow.log && cd -')

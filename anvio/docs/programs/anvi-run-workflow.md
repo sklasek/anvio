@@ -2,7 +2,7 @@ This program allows you to run [Snakemake](https://snakemake.readthedocs.io/en/s
 
 Essentially, an anvi'o workflow will run several anvi'o programs for you in quick succession (based on a standard set of intiial steps that will allow you to quickly get to a point where you can ask novel questions). 
 
-As of now, the available workflows are the %(contigs-workflow)s, the %(metagenomics-workflow)s, the %(pangenomics-workflow)s, the %(phylogenomics-workflow)s, and the %(trnaseq-workflow)s. 
+As of now, the available workflows are the %(contigs-workflow)s, the %(metagenomics-workflow)s, the %(pangenomics-workflow)s, the %(phylogenomics-workflow)s,  %(trnaseq-workflow)s, and the %(ecophylo-workflow)s. 
 
 ### Before running the workflow
 

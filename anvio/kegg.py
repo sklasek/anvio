@@ -5977,6 +5977,7 @@ class KeggModuleEnrichment(KeggContext):
         utils.store_dict_as_TAB_delimited_file(output_dict, output_file_path, key_header='accession', headers=header_list)
 
 
+        # TEST TEST TEST
     def run_enrichment_stats(self):
         """This function is the driver for running the enrichment script on the modules data."""
 

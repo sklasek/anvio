@@ -4011,6 +4011,9 @@ class ContigsDatabase:
         self.db = db.DB(self.db_path, anvio.__contigs__version__, new_database=True)
 
         # creating empty default tables
+        self.db.create_table(t.contig_id_to_contig_name_table_name, t.contig_id_to_contig_name_table_structure, t.contig_id_to_contig_name_table_types)
+        self.db.create_table(t.split_id_to_split_name_table_name, t.split_id_to_split_name_table_structure, t.split_id_to_split_name_table_types)
+        self.db.create_table(t.split_id_to_split_table_name, t.contig_id_to_contig_table_structure, t.contig_id_to_contig_table_types)
         self.db.create_table(t.hmm_hits_table_name, t.hmm_hits_table_structure, t.hmm_hits_table_types)
         self.db.create_table(t.hmm_hits_info_table_name, t.hmm_hits_info_table_structure, t.hmm_hits_info_table_types)
         self.db.create_table(t.hmm_hits_splits_table_name, t.hmm_hits_splits_table_structure, t.hmm_hits_splits_table_types)

@@ -4210,16 +4210,20 @@ class ContigsDatabase:
         else:
             description = ''
 
-        # go through the FASTA file to make sure there are no surprises with deflines, sequence
-        # lengths, or sequence characters.
+        # we will do some FASTA related stuff down below
+        fasta = u.SequenceSource(contigs_fasta)
+
+        # first, we will go through the FASTA file to make sure there are no surprises with deflines,
+        # sequence lengths, or sequence characters.
         self.progress.new('Checking deflines and contig lengths')
         self.progress.update('tick tock ...')
-        fasta = u.SequenceSource(contigs_fasta)
 
         # we only A, C, T, G, N, a, c, t, g, n
         character_regex = re.compile(r'^[ACGTNactgn]+$')
 
+        contig_names_and_lengths = []
         while next(fasta):
+            contig_names_and_lengths.append((fasta.id, len(fasta.seq)), )
             if not utils.check_contig_names(fasta.id, dont_raise=True):
                 self.progress.end()
                 raise ConfigError("At least one of the deflines in your FASTA File does not comply with the 'simple deflines' "
@@ -4256,10 +4260,13 @@ class ContigsDatabase:
                                   "the anvi'o developers, are both surprised by and thankful for your endless patience with such eccentric "
                                   "requests. You the real MVP." % fasta.id)
 
-        fasta.close()
         self.progress.end()
 
-        all_contig_names_in_FASTA = utils.get_all_ids_from_fasta(contigs_fasta)
+        # learn all contig names in the FASTA file (note that we sort contigs based on their lenghts here, this order
+        # will define how contig ids are assigned to contig names later)
+        all_contig_names_in_FASTA = [tpl[0] for tpl in sorted(contig_names_and_lengths, key=lambda x: x[1], reverse=True)]
+
+        # some more sanity checks below
         total_number_of_contigs = len(all_contig_names_in_FASTA)
         if total_number_of_contigs != len(set(all_contig_names_in_FASTA)):
             raise ConfigError("Every contig in the input FASTA file must have a unique ID. You know...")
@@ -4293,17 +4300,72 @@ class ContigsDatabase:
             raise ConfigError("Split size must be at least your k-mer size +1 (so in your case it can't be anything less "
                               "than %d)." % (kmer_size + 1))
 
-        if skip_gene_calling:
-            skip_mindful_splitting = True
+        # let's give the user some early insights into what happened so far.
+        self.run.warning(None, header="EARLY REPORT ON YOUR CONTIGS", lc="yellow")
+        contig_lengths = sorted([tpl[1] for tpl in contig_names_and_lengths], reverse=True)
 
-        # create a blank contigs database on disk, and set the self.db
+        if len(contig_lengths) == 1:
+            additional_summary = f"Your contig had a length of {pp(contig_lengths[0])} nucleotides."
+        elif len(contig_lengths) < 10:
+            additional_summary = (f"Your longest contig was {pp(contig_lengths[0])} nucleotides long, while the shortest had "
+                                 f"{pp(contig_lengths[-1])}.")
+        else:
+            additional_summary = (f"Your top three contigs were {pp(contig_lengths[0])} / {pp(contig_lengths[1])} / and "
+                                 f"{pp(contig_lengths[2])} nucleotides long. Meanwhile, the shortest three in this file had "
+                                 f"{pp(contig_lengths[-3])} / {pp(contig_lengths[-2])} / and {pp(contig_lengths[-1])} nucleotides. "
+                                 f"The N50 value for all contigs was {pp(utils.get_N50(contig_lengths))}. For more comprehensive "
+                                 f"insights into your contigs-db, please run the program `anvi-display-contigs-stats` when it is ready.")
+
+        self.run.info_single(f"Anvi'o is happy to report that it processed the {P('contig', len(contig_names_and_lengths))} it "
+                             f"found in your FASTA file, and so far found nothing to complain about. {additional_summary}",
+                             level=0, nl_after=1)
+
+        # ok. back to business with the magic touch:
         self.touch(db_variant)
 
+        # if we are here, it means we have done two important things: made sure all sequences are fine as they have no weird
+        # characters and stuff, and we have a blank contigs-db waiting to be filled up with stuff. this is tiem to take care
+        # of two very critical things: determine contig ids for sequences in the FASTA file and populate contig id to contig
+        # name association table in the database, and populate the contig sequences table with the right contig ids so we
+        # don't ever need the FASTA file again and we can switch to working with our internal contig ids.
+        self.progress.new('Sequence data are being stored in the contigs-db')
+        self.progress.update('Populating sequence id to sequence name table ...')
+        contig_id_to_contig_name_tuples = [(i, all_contig_names_in_FASTA[i]) for i in range(0, len(all_contig_names_in_FASTA))]
+        self.db._exec_many('''INSERT INTO %s VALUES (?,?)''' % t.contig_id_to_contig_name_table_name, contig_id_to_contig_name_tuples)
+
+        self.progress.update('Populating sequences talbe with new ids ...')
+        contig_name_to_contig_id_dict = dict([(all_contig_names_in_FASTA[i], i) for i in range(0, len(all_contig_names_in_FASTA))])
+
+        fasta.reset()
+
+        counter = 0
+        max_num_items_in_buffer = 1000
+        contig_id_and_sequence_db_entries = []
+        while next(fasta):
+            counter += 1
+            contig_id_and_sequence_db_entries.append((contig_name_to_contig_id_dict[fasta.id], fasta.seq), )
+
+            if counter == max_num_items_in_buffer:
+                self.db._exec_many('''INSERT INTO %s VALUES (?,?)''' % t.contig_sequences_table_name, contig_id_and_sequence_db_entries)
+                counter = 0
+                contig_id_and_sequence_db_entries = []
+
+        self.db._exec_many('''INSERT INTO %s VALUES (?,?)''' % t.contig_sequences_table_name, contig_id_and_sequence_db_entries)
+        counter = 0
+        contig_id_and_sequence_db_entries = []
+
+        self.progress.end()
+        fasta.close()
+
+        # create a blank contigs database on disk, and set the self.db
         # know thyself
         self.db.set_meta_value('db_type', 'contigs')
         self.db.set_meta_value('db_variant', db_variant)
         self.db.set_meta_value('project_name', project_name)
         self.db.set_meta_value('description', description)
+
+        if skip_gene_calling:
+            skip_mindful_splitting = True
 
         # this will be the unique information that will be passed downstream whenever this db is used:
         contigs_db_hash = self.get_hash()
@@ -4316,12 +4378,12 @@ class ContigsDatabase:
         # gene calling first, so we understand wher genes start and end. this information will guide the
         # arrangement of the breakpoint of splits
         genes_in_contigs_dict = {}
-        contig_name_to_gene_start_stops = {}
+        contig_id_to_gene_start_stops = {}
         if not skip_gene_calling:
             # temporarily disconnect to perform gene calls
             self.db.disconnect()
 
-            gene_calls_tables = TablesForGeneCalls(self.db_path, contigs_fasta, args=args, run=self.run, progress=self.progress, debug=anvio.DEBUG)
+            gene_calls_tables = TablesForGeneCalls(self.db_path, args=args, run=self.run, progress=self.progress, debug=anvio.DEBUG)
 
             # if the user provided a file for external gene calls, use it. otherwise do the gene calling yourself.
             if external_gene_calls_file_path:
@@ -4339,15 +4401,15 @@ class ContigsDatabase:
 
             # reconnect and learn about what's done
             self.db = db.DB(self.db_path, anvio.__contigs__version__)
-
             genes_in_contigs_dict = self.db.get_table_as_dict(t.genes_in_contigs_table_name)
+            self.db.disconnect()
 
             for gene_unique_id in genes_in_contigs_dict:
                 e = genes_in_contigs_dict[gene_unique_id]
-                if e['contig'] not in contig_name_to_gene_start_stops:
-                    contig_name_to_gene_start_stops[e['contig']] = set([])
+                if e['contig'] not in contig_id_to_gene_start_stops:
+                    contig_id_to_gene_start_stops[e['contig']] = set([])
 
-                contig_name_to_gene_start_stops[e['contig']].add((gene_unique_id, e['start'], e['stop']), )
+                contig_id_to_gene_start_stops[e['contig']].add((gene_unique_id, e['start'], e['stop']), )
 
         # print some information for the user
         self.run.warning(None, header="CONTIGS DB CREATE REPORT", lc="cyan")
@@ -4363,10 +4425,7 @@ class ContigsDatabase:
         self.run.info('Ignoring internal stop codons?', ignore_internal_stop_codons)
         self.run.info('Splitting pays attention to gene calls?', (not skip_mindful_splitting))
 
-        # here we will process each item in the contigs fasta file.
-        fasta = u.SequenceSource(contigs_fasta)
-        db_entries_contig_sequences = []
-
+        # here we will continue our processing of the contgs to populate some additional tables
         contigs_kmer_table = KMerTablesForContigsAndSplits('kmer_contigs', k=kmer_size)
         splits_kmer_table = KMerTablesForContigsAndSplits('kmer_splits', k=kmer_size)
         nt_positions_table = TableForNtPositions()

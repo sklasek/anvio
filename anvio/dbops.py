@@ -4260,9 +4260,9 @@ class ContigsDatabase:
         fasta.close()
         self.progress.end()
 
-        all_ids_in_FASTA = utils.get_all_ids_from_fasta(contigs_fasta)
-        total_number_of_contigs = len(all_ids_in_FASTA)
-        if total_number_of_contigs != len(set(all_ids_in_FASTA)):
+        all_contig_names_in_FASTA = utils.get_all_ids_from_fasta(contigs_fasta)
+        total_number_of_contigs = len(all_contig_names_in_FASTA)
+        if total_number_of_contigs != len(set(all_contig_names_in_FASTA)):
             raise ConfigError("Every contig in the input FASTA file must have a unique ID. You know...")
 
         if split_length is None:

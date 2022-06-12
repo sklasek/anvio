@@ -74,7 +74,6 @@ pan_gene_clusters_table_types          = [    'numeric'   ,      'str'       ,  
 #
 ####################################################################################################
 
-
 contig_sequences_table_name            = 'contig_sequences'
 contig_sequences_table_structure       = ['contig', 'sequence']
 contig_sequences_table_types           = [  'str' ,   'str'   ]
@@ -111,12 +110,12 @@ taxon_names_table_structure            = ['taxon_id', "t_phylum", "t_class", "t_
 taxon_names_table_types                = [ 'numeric',   'text'  ,  'text'  ,  'text'  ,  'text'   ,  'text'  ,   'text'   ]
 
 splits_taxonomy_table_name             = 'splits_taxonomy'
-splits_taxonomy_table_structure        = ['split', 'taxon_id',]
-splits_taxonomy_table_types            = [ 'text',  'numeric',]
+splits_taxonomy_table_structure        = ['split', 'taxon_id']
+splits_taxonomy_table_types            = [ 'text',  'numeric']
 
 genes_taxonomy_table_name              = 'genes_taxonomy'
-genes_taxonomy_table_structure         = ['gene_callers_id', 'taxon_id',]
-genes_taxonomy_table_types             = [    'numeric'    ,  'numeric',]
+genes_taxonomy_table_structure         = ['gene_callers_id', 'taxon_id']
+genes_taxonomy_table_types             = [    'numeric'    ,  'numeric']
 
 hmm_hits_info_table_name               = 'hmm_hits_info'
 hmm_hits_info_table_structure          = ['source', 'ref' , 'search_type', 'domain', 'genes']

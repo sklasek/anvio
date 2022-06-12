@@ -35,6 +35,76 @@ sqlite3.register_adapter(numpy.float64, float)
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
+class DataIterator:
+    """A simple data iterator class to avoid huge memory bottlenecks.
+
+    Upon initialization, this class will divide all rows in the desired table to offer chunks of
+    `yield_size` and make that data avilable through the class variable `self.data`.
+
+    Here is an example use of this class:
+
+        >>> iterator = db.DataIterator('/PATH/TO/CONTIGS.db', 'contig_sequences', yield_size=100)
+        >>> while next(iterator):
+        >>>     print(iterator.data)
+
+    Currently the `iterator.data` is filled by `db.get_some_rows_from_table`, but another class
+    variable can determine whether this class use `db.get_some_rows_from_table_as_dict`.
+    """
+
+    def __init__(self, db_path, table_name, yield_size=500):
+        self.db_path = db_path
+        self.table_name = table_name
+        self.yield_size = yield_size
+
+        self.sanity_check()
+
+        anvio_db = DB(self.db_path, None, ignore_version=True, read_only=True)
+        self.total_num_entries_in_table = anvio_db.get_row_counts_from_table(self.table_name)
+        anvio_db.disconnect()
+
+        # determine all the chunks of data in the table
+        self.chunks = [(i, i + self.yield_size) for i in range(1, self.total_num_entries_in_table + 1, self.yield_size)]
+
+        # set the current chunk
+        self.current_chunk = 0
+
+        self.data = None
+
+
+    def __next__(self):
+        if self.current_chunk + 1 > len(self.chunks):
+            self.data = None
+            return None
+
+        where_clause = f'ROWID >= {self.chunks[self.current_chunk][0]} and ROWID < {self.chunks[self.current_chunk][1]}' 
+
+        self.data = DB(self.db_path, None, ignore_version=True, read_only=True).get_some_rows_from_table(self.table_name, where_clause=where_clause)
+
+        self.current_chunk += 1
+
+        return True
+
+
+    def sanity_check(self):
+        try:
+            self.yield_size = int(self.yield_size)
+            assert self.yield_size > 0
+        except:
+            raise ConfigError(f"The 'yield size' must be an integer value that is larger than 0 -- `{self.yield_size}` "
+                              f"is a no go :/")
+
+        try:
+            anvio_db = DB(self.db_path, None, ignore_version=True, read_only=True)
+        except:
+            raise ConfigError(f"The file at `{self.db_path}` does not seem to be a proper anvi'o database :/")
+
+        if self.table_name not in anvio_db.table_names_in_db:
+            raise ConfigError(f"The table `{self.table_name}` does not seem to be in the database :/ Here are all the "
+                              f"ones this database knows about: {', '.join(anvio_db.get_table_names())}")
+
+        anvio_db.disconnect()
+
+
 def get_list_in_chunks(input_list, num_items_in_each_chunk=5000):
     """Yield smaller bits of a list"""
 

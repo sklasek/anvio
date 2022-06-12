@@ -48,7 +48,7 @@ indel_test_class_null = VariablityTestFactory(params=None)
 
 
 def gen_split_name(parent_name, order):
-    return '_'.join([parent_name, 'split', '%05d' % (order + 1)])
+    return f"{parent_name}_{order + 1}"
 
 
 def get_atomic_data(sample_id, contigs, atomic_data_field):

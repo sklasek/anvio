@@ -36,6 +36,26 @@ versions_for_db_types = {'contigs': contigs_db_version,
                          'config': workflow_config_version,
                          'modules': metabolic_modules_db_version}
 
+####################################################################################################
+#
+#     TABLE DESCRIPTIONS SPECIFIC FOR THE CONVERSION OF CONTIG AND SAMPLE NAMES
+#       We need these tables to keep track of how things are called in the 'outside'
+#       world, and how they relate to how anvi'o calls them.
+#
+####################################################################################################
+
+contig_id_to_contig_name_table_name      = 'contig_id_to_contig_name'
+contig_id_to_contig_name_table_structure = ['contig_id', 'contig_name']
+contig_id_to_contig_name_table_types     = [ 'numeric' ,     'str'    ]
+
+split_id_to_split_name_table_name        = 'split_id_to_split_name'
+split_id_to_split_name_table_structure   = ['split_id', 'split_name']
+split_id_to_split_name_table_types       = [   'str'  ,     'str'   ]
+
+sample_id_to_sample_name_table_name      = 'sample_id_to_sample_name'
+sample_id_to_sample_name_table_structure = ['smaple_id', 'sample_name']
+sample_id_to_sample_name_table_types     = [ 'numeric' ,     'str'    ]
+
 
 ####################################################################################################
 #

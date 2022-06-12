@@ -4434,54 +4434,52 @@ class ContigsDatabase:
 
         recovered_split_lengths = []
 
-        # THE INFAMOUS GEN CONTGS DB LOOP (because it is so costly, we call it South Loop)
+        # THE INFAMOUS GEN CONTGS DB LOOP (because it is so costly, we call it the South Loop (wink wink, Chicagoans))
         self.progress.new('The South Loop', progress_total_items=total_number_of_contigs)
-        fasta.reset()
-        while next(fasta):
+
+        contig_sequences_iterator = db.DataIterator(self.db_path, 'contig_sequences', yield_size=500)
+        while next(contig_sequences_iterator):
             self.progress.increment()
 
-            contig_name = fasta.id
-            contig_sequence = fasta.seq
+            for contig_id, contig_sequence in contig_sequences_iterator.data:
+                self.progress.update(f"Contig '{contig_id}' ")
 
-            self.progress.update('Contig "%d" ' % fasta.pos)
+                genes_in_contig = contig_id_to_gene_start_stops[contig_id] if contig_id in contig_id_to_gene_start_stops else set([])
 
-            genes_in_contig = contig_name_to_gene_start_stops[contig_name] if contig_name in contig_name_to_gene_start_stops else set([])
+                self.progress.append('has %d genes, ' % len(genes_in_contig))
+                if skip_mindful_splitting:
+                    contig_length, split_start_stops, contig_gc_content = contigs_info_table.append(contig_id, contig_sequence, set([]))
+                else:
+                    contig_length, split_start_stops, contig_gc_content = contigs_info_table.append(contig_id, contig_sequence, genes_in_contig)
 
-            self.progress.append('has %d genes, ' % len(genes_in_contig))
-            if skip_mindful_splitting:
-                contig_length, split_start_stops, contig_gc_content = contigs_info_table.append(contig_name, contig_sequence, set([]))
-            else:
-                contig_length, split_start_stops, contig_gc_content = contigs_info_table.append(contig_name, contig_sequence, genes_in_contig)
+                # let's keep an eye on the returned split lengths
+                if len(split_start_stops) > 1:
+                    recovered_split_lengths.extend([s[1] - s[0] for s in split_start_stops])
 
-            # let's keep an eye on the returned split lengths
-            if len(split_start_stops) > 1:
-                recovered_split_lengths.extend([s[1] - s[0] for s in split_start_stops])
+                self.progress.append('and %d nts. Now computing: auxiliary ... ' % contig_length)
+                if genes_in_contig:
+                    nt_position_info_list = self.compress_nt_position_info(contig_length, genes_in_contig, genes_in_contigs_dict)
+                    nt_positions_table.append(contig_id, nt_position_info_list)
 
-            self.progress.append('and %d nts. Now computing: auxiliary ... ' % contig_length)
-            if genes_in_contig:
-                nt_position_info_list = self.compress_nt_position_info(contig_length, genes_in_contig, genes_in_contigs_dict)
-                nt_positions_table.append(contig_name, nt_position_info_list)
+                contig_kmer_freq = contigs_kmer_table.get_kmer_freq(contig_sequence)
 
-            contig_kmer_freq = contigs_kmer_table.get_kmer_freq(contig_sequence)
+                self.progress.append('k-mers ...')
+                for order in range(0, len(split_start_stops)):
+                    start, end = split_start_stops[order]
+                    split_name = contigops.gen_split_name(contig_id, order)
 
-            self.progress.append('k-mers ...')
-            for order in range(0, len(split_start_stops)):
-                start, end = split_start_stops[order]
-                split_name = contigops.gen_split_name(contig_name, order)
+                    # this is very confusing, because both contigs_kmer_table and splits_kmer_able in fact
+                    # holds kmer values for splits only. in one table, each split has a kmer value of their
+                    # contigs (to not lose the genomic context while item_order based on kmers), in the other
+                    # one each split holds its own kmer value.
+                    contigs_kmer_table.append(split_name, contig_sequence[start:end], kmer_freq=contig_kmer_freq)
+                    splits_kmer_table.append(split_name, contig_sequence[start:end])
 
-                # this is very confusing, because both contigs_kmer_table and splits_kmer_able in fact
-                # holds kmer values for splits only. in one table, each split has a kmer value of their
-                # contigs (to not lose the genomic context while item_order based on kmers), in the other
-                # one each split holds its own kmer value.
-                contigs_kmer_table.append(split_name, contig_sequence[start:end], kmer_freq=contig_kmer_freq)
-                splits_kmer_table.append(split_name, contig_sequence[start:end])
-
-                splits_info_table.append(split_name, contig_sequence[start:end], order, start, end, contig_gc_content, contig_name)
-
-            db_entries_contig_sequences.append((contig_name, contig_sequence), )
+                    splits_info_table.append(split_name, contig_sequence[start:end], order, start, end, contig_gc_content, contig_id)
 
         self.progress.end()
 
+        self.db = db.DB(self.db_path, anvio.__contigs__version__)
         self.db.set_meta_value('kmer_size', kmer_size)
         nt_positions_table.store(self.db)
         contigs_kmer_table.store(self.db)
@@ -4489,7 +4487,6 @@ class ContigsDatabase:
         contigs_info_table.store(self.db)
         splits_info_table.store(self.db)
 
-        self.db._exec_many('''INSERT INTO %s VALUES (?,?)''' % t.contig_sequences_table_name, db_entries_contig_sequences)
 
         # set some useful meta values:
         self.db.set_meta_value('num_contigs', contigs_info_table.total_contigs)

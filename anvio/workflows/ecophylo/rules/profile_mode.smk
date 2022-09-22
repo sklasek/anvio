@@ -52,11 +52,11 @@ rule run_metagenomics_workflow:
     """Run metagenomics workflow to profile hmm_hits"""
 
     version: 1.0
-    log: "00_LOGS/{hmm}_run_metagenomics_workflow.log"
+    log: "00_LOGS/run_metagenomics_workflow.log"
     input:
         config = rules.make_metagenomics_config_file.output.config,
     output:
-        done = touch(os.path.join(dirs_dict['HOME'], "METAGENOMICS_WORKFLOW", "{hmm}_metagenomics_workflow.done"))
+        done = touch(os.path.join(dirs_dict['HOME'], "METAGENOMICS_WORKFLOW", "metagenomics_workflow.done"))
     params:
         HPC_string = M.metagenomics_workflow_HPC_string,
         snakemake_additional_params = M.snakemake_additional_params 
@@ -91,7 +91,7 @@ rule add_default_collection:
     log: os.path.join(dirs_dict['LOGS_DIR'], "add_default_collection_{hmm}.log")
     input: metagenomics_workflow_done = rules.run_metagenomics_workflow.output.done
     params:
-        contigsDB = ancient(os.path.join(dirs_dict['HOME'], "METAGENOMICS_WORKFLOW/03_CONTIGS", "{hmm}.db")),
+        contigsDB = ancient(os.path.join(dirs_dict['HOME'], "METAGENOMICS_WORKFLOW", "03_CONTIGS", "{hmm}.db")),
         profileDB = os.path.join(dirs_dict['HOME'], "06_MERGED", "{hmm}", "PROFILE.db")
     output: done = touch(os.path.join("METAGENOMICS_WORKFLOW", "{hmm}_add_default_collection.done"))
     threads: M.T('add_default_collection')
@@ -107,10 +107,10 @@ rule anvi_summarize:
     input: 
         done = rules.add_default_collection.output.done
     params:
-        contigsDB = ancient(os.path.join(dirs_dict['HOME'], "METAGENOMICS_WORKFLOW/03_CONTIGS", "{hmm}-contigs.db")),
-        profileDB = os.path.join(dirs_dict['HOME'], "METAGENOMICS_WORKFLOW/06_MERGED", "{hmm}", "PROFILE.db"),
-        output_dir = os.path.join(dirs_dict['HOME'], "METAGENOMICS_WORKFLOW/07_SUMMARY", "{hmm}")
-    output: touch(os.path.join(dirs_dict['HOME'], "METAGENOMICS_WORKFLOW/07_SUMMARY", "{hmm}_summarize.done"))
+        contigsDB = ancient(os.path.join(dirs_dict['HOME'], "METAGENOMICS_WORKFLOW", "03_CONTIGS", "{hmm}-contigs.db")),
+        profileDB = os.path.join(dirs_dict['HOME'], "METAGENOMICS_WORKFLOW", "06_MERGED", "{hmm}", "PROFILE.db"),
+        output_dir = os.path.join(dirs_dict['HOME'], "METAGENOMICS_WORKFLOW", "07_SUMMARY", "{hmm}")
+    output: touch(os.path.join(dirs_dict['HOME'], "METAGENOMICS_WORKFLOW", "07_SUMMARY", "{hmm}_summarize.done"))
     threads: M.T('anvi_summarize')
     run: 
         shell('anvi-summarize -c {params.contigsDB} -p {params.profileDB} -o {params.output_dir} -C DEFAULT --init-gene-coverages --just-do-it;')

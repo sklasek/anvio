@@ -175,43 +175,40 @@ class EcoPhyloWorkflow(WorkflowSuperClass):
             gene_caller_to_use = constants.default_gene_caller
 
         if self.metagenomes:
-            args = argparse.Namespace(metagenomes=self.get_param_value_from_config(['metagenomes']), gene_caller = gene_caller_to_use)
-            g = MetagenomeDescriptions(args)
-            g.load_metagenome_descriptions(init=False)
-            self.metagenomes_dict = g.metagenomes_dict
-            self.metagenomes_name_list = list(self.metagenomes_dict.keys())
-            self.metagenomes_path_list = [value['contigs_db_path'] for key,value in self.metagenomes_dict.items()]
-            self.contigs_db_name_path_dict.update(dict(zip(self.metagenomes_name_list, self.metagenomes_path_list)))
+            filesnpaths.is_file_exists(self.metagenomes)
 
-            self.metagenomes_df = pd.read_csv(self.metagenomes, sep='\t', index_col=False)
-            if 'bam' in self.metagenomes_df.columns:
-                self.contigs_db_name_bam_dict.update(dict(zip(self.metagenomes_name_list, self.metagenomes_df.bam)))
-                self.metagenomes_profiles_list = self.metagenomes_df.bam.to_list()
-            self.names_list.extend(self.metagenomes_name_list)
+            try:
+                self.metagenomes_df = pd.read_csv(self.metagenomes, sep='\t', index_col=False)
+                self.metagenomes_name_list = self.metagenomes_df.name.to_list()
+                self.metagenomes_path_list = self.metagenomes_df.contigs_db_path.to_list()
+                self.contigs_db_name_path_dict.update(dict(zip(self.metagenomes_name_list, self.metagenomes_path_list)))
+                self.names_list.extend(self.metagenomes_name_list)
 
+                if 'bam' in self.metagenomes_df.columns:
+                    self.contigs_db_name_bam_dict.update(dict(zip(self.metagenomes_name_list, self.metagenomes_df.bam)))
+                    self.metagenomes_profiles_list = self.metagenomes_df.bam.to_list()
+            except IndexError as e:
+                raise ConfigError("The metagenomes.txt file, '%s', does not appear to be properly formatted. "
+                                  "This is the error from trying to load it: '%s'" % (self.metagenomes_df, e))
         else:
             self.metagenomes_name_list = []
         
         if self.external_genomes:
-            
-            # FIXME: metagenomes.txt or external-genomes.txt with multiple gene-callers will break
-            # here. Users should only have one type of gene-caller e.g. "NCBI_PGAP".
+            filesnpaths.is_file_exists(self.external_genomes)
+            try:
+                self.external_genomes_df = pd.read_csv(self.external_genomes, sep='\t', index_col=False)
+                self.external_genomes_names_list = self.external_genomes_df.name.to_list()
+                self.external_genomes_path_list = self.external_genomes_df.contigs_db_path.to_list()
+                self.contigs_db_name_path_dict.update(dict(zip(self.external_genomes_names_list, self.external_genomes_path_list)))
+                self.names_list.extend(self.external_genomes_names_list)
 
-            args = argparse.Namespace(external_genomes=self.external_genomes, gene_caller = gene_caller_to_use)
-            genome_descriptions = GenomeDescriptions(args)
-            genome_descriptions.load_genomes_descriptions(init=False)
-            self.external_genomes_dict = genome_descriptions.external_genomes_dict
-            self.external_genomes_names_list = list(self.external_genomes_dict.keys())
-            self.external_genomes_path_list = [value['contigs_db_path'] for key,value in self.external_genomes_dict.items()]
-            self.contigs_db_name_path_dict.update(dict(zip(self.external_genomes_names_list, self.external_genomes_path_list)))
+                if 'bam' in self.external_genomes_df.columns:
+                    self.contigs_db_name_bam_dict.update(dict(zip(self.external_genomes_names_list, self.external_genomes_df.bam)))
+                    self.external_genomes_profiles_list = self.external_genomes_df.bam.to_list()
 
-
-            self.external_genomes_df = pd.read_csv(self.external_genomes, sep='\t', index_col=False)
-            if 'bam' in self.external_genomes_df.columns:
-                self.contigs_db_name_bam_dict.update(dict(zip(self.external_genomes_names_list, self.external_genomes_df.bam)))
-                self.external_genomes_profiles_list = self.external_genomes_df.bam.to_list()
-            self.names_list.extend(self.external_genomes_names_list)
-
+            except IndexError as e:
+                raise ConfigError("The external-genomes.txt file, '%s', does not appear to be properly formatted. "
+                                  "This is the error from trying to load it: '%s'" % (self.external_genomes_df, e))
         else:
             self.external_genomes_names_list = []
 
@@ -362,6 +359,7 @@ class EcoPhyloWorkflow(WorkflowSuperClass):
         
         return target_files
     
+
     def init_hmm_list_txt(self):
         """This function will sanity check hmm-list.txt
 

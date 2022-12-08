@@ -1,0 +1,112 @@
+#!/usr/bin/env python
+# -*- coding: utf-8
+
+import sys
+
+import anvio
+import anvio.terminal as terminal
+import anvio.filesnpaths as filesnpaths
+
+from Bio import AlignIO
+
+from anvio.errors import ConfigError, FilesNPathsError
+
+__author__ = "Developers of anvi'o (see AUTHORS.txt)"
+__copyright__ = "Copyleft 2015-2018, the Meren Lab (http://merenlab.org/)"
+__credits__ = []
+__license__ = "GPL 3.0"
+__version__ = anvio.__version__
+__authors__ = ['mschecht', 'semiller10']
+__requires__ = ["fasta"]
+__provides__ = ["fasta"]
+__description__ =  ("Subset a multiple sequence alignment (MSA) FASTA file for specific "
+                    "columns based on the residues of a target sequence")
+
+
+run = terminal.Run()
+progress = terminal.Progress()
+pp = terminal.pretty_print
+
+
+def main(args):
+    """
+
+    """
+
+    # sanity checks
+    filesnpaths.is_file_exists(args.fasta)
+    filesnpaths.is_output_file_writable(args.output_file)
+    
+    columns_to_subset_sorted = sorted(args.columns_to_subset)
+
+    # Read in the multiple sequence alignment from a FASTA file
+    alignment = AlignIO.read(args.fasta, "fasta")
+    
+    alignment_ids = [record.id for record in alignment]
+    if args.target_sequence not in alignment_ids:
+        raise ConfigError(f"Your --target-sequence header, \"{args.target_sequence}\" was not found the MSA: {args.fasta}")
+
+    for i in columns_to_subset_sorted:
+        if i >= alignment.get_alignment_length():
+            raise ConfigError(f"anvi'o cannot parse a column in your MSA that doesn't exist. Your MSA has "
+                              f"{str(alignment.get_alignment_length())} columns so all your indices must be smaller. "
+                              f"Please double check --columns-to-subset.") 
+
+    run.info('Input', args.fasta)
+    run.info('Output', args.output_file)
+
+    # Initialize empty slice of MSA
+    alignment_sliced = alignment[:, 0:0]
+
+    # re-index to 0 because python
+    columns_to_subset_sorted = [i - 1 for i in columns_to_subset_sorted]
+
+    # Slice MSA with residue numbers from target sequence
+    columns_to_subset_sorted_iter = iter(columns_to_subset_sorted)
+    interesting_index = next(columns_to_subset_sorted_iter)
+    nongap_seq_index = 0
+    for record in alignment:
+        if record.id == args.target_sequence:
+            for i,item in enumerate(str(record.seq)):
+                if item == '-':
+                    continue
+                if nongap_seq_index == interesting_index:
+                    alignment_sliced = alignment_sliced + alignment[:, i:i+1]
+                    try:
+                        interesting_index = next(columns_to_subset_sorted_iter)
+                    except StopIteration:
+                        break
+                nongap_seq_index += 1
+
+    
+    # Write the subsetted alignment to a new FASTA file
+    AlignIO.write(alignment_sliced, args.output_file, "fasta")
+
+
+if __name__ == '__main__':
+    from anvio.argparse import ArgumentParser
+    parser = ArgumentParser(description=__description__)
+
+    groupA = parser.add_argument_group('INPUT', 'The input fasta multiple sequence alignment')
+    groupA.add_argument('fasta', metavar='FASTA FILE')
+
+    groupB = parser.add_argument_group('OUTPUT', 'Dealing with the output.')
+    groupB.add_argument('-o', '--output-file', required=True, metavar='FASTA FILE PATH',
+                        help="Output file path for the subsetted MSA.")
+
+    groupC = parser.add_argument_group('OPERATIONS: SUBSET COLUMNS')
+    groupC.add_argument('--target-sequence', type=str, default=None, required=True,
+                        help="Sequence in the fasta file with your residues of interest")
+    groupC.add_argument('--columns-to-subset', type=int, nargs='+', required=True,
+                        help="Residue numbers in the target sequence, space separated e.g. 3 17 334")
+
+    args = parser.get_args(parser)
+
+    try:
+        main(args)
+    except ConfigError as e:
+        print(e)
+        sys.exit(-1)
+    except FilesNPathsError as e:
+        print(e)
+        sys.exit(-2)

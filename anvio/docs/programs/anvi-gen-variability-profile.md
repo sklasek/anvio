@@ -26,6 +26,16 @@ anvi-gen-variability-profile -p %(profile-db)s \
                              -s %(structure-db)s 
 {{ codestop }}
 
+Using the flag `--compute-gene-coverage-stats` will return [columns for gene_coverage, non_outlier_gene_coverage, and non_outlier_gene_coverage_std](https://merenlab.org/2015/07/20/analyzing-variability/#the-output-matrix) that are not provided by default. 
+
+{{ codestart }}
+anvi-gen-variability-profile -p %(profile-db)s \
+                             -c %(contigs-db)s \ 
+                             -C DEFAULT \
+                             -b EVERYTHING
+                             --compute-gene-coverage-stats
+{{ codestop }}
+
 ### Focusing on a subset of the input 
 
 Instead of focusing on everything (providing the collection `DEFAULT` and the bin `EVERYTHING`), there are three ways to focus on a subset of the input: 
